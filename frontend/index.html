@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<title>Job Card Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Segoe UI,Arial,sans-serif;
+}
+
+body{
+
+background:#eef2f7;
+color:#1f2937;
+
+}
+
+.container{
+
+width:92%;
+max-width:1350px;
+margin:auto;
+padding:30px;
+
+}
+
+header{
+
+background:#163A5F;
+color:white;
+
+padding:28px 35px;
+
+border-radius:16px;
+
+margin-bottom:25px;
+
+}
+
+header h1{
+
+font-size:30px;
+
+margin-bottom:6px;
+
+}
+
+header p{
+
+opacity:.9;
+
+font-size:15px;
+
+}
+
+.section{
+
+background:white;
+
+border-radius:14px;
+
+padding:22px;
+
+margin-bottom:25px;
+
+box-shadow:0 5px 18px rgba(0,0,0,.08);
+
+}
+
+.section h2{
+
+margin-bottom:18px;
+
+font-size:22px;
+
+}
+
+.upload-row{
+
+display:flex;
+
+gap:15px;
+
+align-items:center;
+
+}
+
+input[type=file]{
+
+padding:10px;
+
+border:1px solid #d1d5db;
+
+border-radius:8px;
+
+background:white;
+
+}
+
+button{
+
+background:#163A5F;
+
+color:white;
+
+padding:10px 22px;
+
+border:none;
+
+border-radius:8px;
+
+cursor:pointer;
+
+font-weight:600;
+
+}
+
+button:hover{
+
+background:#0f2b46;
+
+}
+
+#status{
+
+margin-top:15px;
+
+font-weight:500;
+
+color:#4b5563;
+
+}
+
+#dashboard{
+
+display:none;
+
+}
+
+.cards{
+
+display:grid;
+
+grid-template-columns:repeat(4,1fr);
+
+gap:18px;
+
+margin-bottom:30px;
+
+}
+
+.card{
+
+background:white;
+
+border-left:6px solid #163A5F;
+
+padding:18px;
+
+border-radius:10px;
+
+box-shadow:0 3px 10px rgba(0,0,0,.08);
+
+}
+
+.card.done{
+
+border-left-color:#22c55e;
+
+}
+
+.card.due{
+
+border-left-color:#9ca3af;
+
+}
+
+.card.progress{
+
+border-left-color:#2563eb;
+
+}
+
+.card h3{
+
+font-size:14px;
+
+color:#6b7280;
+
+margin-bottom:10px;
+
+}
+
+.card p{
+
+font-size:30px;
+
+font-weight:bold;
+
+}
+
+.progress-container{
+    margin-top:12px;
+    height:10px;
+    background:#e5e7eb;
+    border-radius:20px;
+    overflow:hidden;
+    display:flex;
+}
+
+.progress-segment{
+    height:100%;
+    transition:width .4s;
+}
+
+.progress-done{
+    background:#22c55e;
+}
+
+.progress-due{
+    background:#9ca3af;
+}
+
+.progress-half{
+    background:#2563eb;
+}
+
+.chart-box{
+
+background:white;
+
+padding:20px;
+
+border-radius:10px;
+
+box-shadow:0 3px 10px rgba(0,0,0,.08);
+
+}
+
+canvas{
+
+max-height:350px;
+
+}
+
+.chat{
+
+margin-top:10px;
+
+display:flex;
+
+gap:12px;
+
+}
+
+input[type=text]{
+
+flex:1;
+
+padding:12px;
+
+border:1px solid #d1d5db;
+
+border-radius:8px;
+
+font-size:15px;
+
+}
+
+#response{
+    display:none;
+    margin-top:18px;
+    padding:18px;
+    background:#f9fafb;
+    border-radius:8px;
+    line-height:1.6;
+    border:1px solid #e5e7eb;
+}
+
+@media(max-width:900px){
+
+.cards{
+
+grid-template-columns:repeat(2,1fr);
+
+}
+
+}
+
+@media(max-width:650px){
+
+.cards{
+
+grid-template-columns:1fr;
+
+}
+
+.upload-row{
+
+flex-direction:column;
+
+align-items:flex-start;
+
+}
+
+.chat{
+
+flex-direction:column;
+
+}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<header>
+
+<h1>Job Card Assistant</h1>
+
+</header>
+
+<div class="section">
+
+<h2>Upload Job Cards</h2>
+
+<div class="upload-row">
+
+<input type="file" id="files" multiple>
+
+<button onclick="uploadFiles()">
+
+Upload & Process
+
+</button>
+
+</div>
+
+<p id="status"></p>
+
+</div>
+
+<div class="section" id="dashboard">
+
+<h2>Dashboard</h2>
+
+<div class="cards">
+
+<div class="card">
+
+<h3>Total Tasks</h3>
+
+<p id="totalTasks">0</p>
+
+</div>
+
+<div class="card done">
+
+<h3>Done Tasks</h3>
+
+<p id="doneCount">0</p>
+
+</div>
+
+<div class="card due">
+
+<h3>Due Tasks</h3>
+
+<p id="dueCount">0</p>
+
+</div>
+
+<div class="card progress">
+
+<h3>Overall Progress</h3>
+
+<p id="completionRate">0%</p>
+
+<div class="progress-container">
+
+    <div id="doneBar" class="progress-segment progress-done"></div>
+
+    <div id="dueBar" class="progress-segment progress-due"></div>
+
+    <div id="halfBar" class="progress-segment progress-half"></div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="chart-box">
+
+<h3 style="margin-bottom:15px;">
+
+Task Status by Employee
+
+</h3>
+
+<canvas id="employeeChart"></canvas>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<h2>AI Project Assistant</h2>
+
+<p style="color:#6b7280;margin-bottom:18px;">
+
+Ask questions about uploaded job cards.
+
+</p>
+
+<div class="chat">
+
+<input
+    type="text"
+    id="msg">
+
+<button onclick="sendMessage()">
+
+Ask
+
+</button>
+
+</div>
+
+<div id="response">
+
+</div>
+
+</div>
+
+</div>
+
+<script src="app.js"></script>
+
+</body>
+</html>

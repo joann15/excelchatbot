@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+
+# Environment variables
+.env
+
+# VS Code
+.vscode/
+
+# Uploaded Excel files
+uploads/*
+!uploads/.gitkeep
+
+# Operating System
+.DS_Store
+Thumbs.db
