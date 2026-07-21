@@ -13,7 +13,7 @@ for (let file of files) {
 }
     document.getElementById("status").innerText = "Processing...";
 
-    fetch("http://127.0.0.1:5000/upload", {
+    fetch(`${API_URL}/upload`, {
         method: "POST",
         body: formData
     })
@@ -35,7 +35,7 @@ for (let file of files) {
 // ================= DASHBOARD =================
 function loadDashboard() {
 
-    fetch("http://127.0.0.1:5000/dashboard")
+    fetch(`${API_URL}/dashboard`)
         .then(res => res.json())
         .then(data => {
 
@@ -132,7 +132,7 @@ function sendMessage() {
     responseBox.style.display = "block";
     responseBox.innerHTML = "Thinking...";
 
-    fetch("http://127.0.0.1:5000/chat", {
+    fetch(`${API_URL}/chat`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
