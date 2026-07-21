@@ -7,53 +7,6 @@ from flask_cors import CORS
 import requests
 from datetime import datetime
 
-EMPLOYEE_EMAILS = {
-    "Soumyadeep": "joann34074@gmail.com",
-    "Soumyadeep P": "joann34074@gmail.com",
-
-    "Akash": "joannmathews123@gmail.com",
-    "Akash P": "joannmathews123@gmail.com",
-
-    "Gaurav": "jmm4860@g.rit.edu",
-    "Gaurav M": "jmm4860@g.rit.edu",
-
-    "Ankit": "joann34074@gmail.com",
-    "Ankit O": "joann34074@gmail.com",
-
-    "Pranav": "joannmathews123@gmail.com",
-    "Pranav Y": "joannmathews123@gmail.com",
-
-    "Aditya": "jmm4860@g.rit.edu",
-    "Aditya S": "jmm4860@g.rit.edu",
-
-    "Shrawani": "joann34074@gmail.com",
-    "Shrawani M": "joann34074@gmail.com",
-
-    "Apeksha": "joannmathews123@gmail.com",
-    "Apeksha S": "joannmathews123@gmail.com",
-
-    "Sneha": "jmm4860@g.rit.edu",
-    "Sneha B": "jmm4860@g.rit.edu",
-
-    "Rahi": "joann34074@gmail.com",
-    "Rahi M": "joann34074@gmail.com",
-
-    "Vanshika": "joannmathews123@gmail.com",
-    "Vanshika G": "joannmathews123@gmail.com",
-
-    "Ruhikesh": "jmm4860@g.rit.edu",
-    "Ruhikesh N": "jmm4860@g.rit.edu",
-
-    "Nitish": "joann34074@gmail.com",
-    "Nitish K": "joann34074@gmail.com",
-
-    "Tanvi": "joannmathews123@gmail.com",
-    "Tanvi B": "joannmathews123@gmail.com",
-
-    "Chandrashekhar": "jmm4860@g.rit.edu",
-    "Chandrashekhar L": "jmm4860@g.rit.edu",
-}
-
 load_dotenv(override=True)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -67,6 +20,70 @@ CORS(app)
 # In-memory DB
 # ---------------------------
 DB = []
+import sqlite3
+
+def get_employee_email(employee):
+    conn = sqlite3.connect("employees.db")
+    cur = conn.cursor()
+
+    # Extract first name from "Tanvi B" -> "Tanvi"
+    first_name = employee.split()[0]
+
+    cur.execute("""
+        SELECT email
+        FROM employees
+        WHERE LOWER(employee_name)=LOWER(?)
+    """, (first_name,))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if row:
+        return row[0]
+
+    return None
+
+def add_employee_db(name, email):
+    conn = sqlite3.connect("employees.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO employees(employee_name,email)
+        VALUES(?,?)
+        """,
+        (name, email)
+    )
+
+    conn.commit()
+    conn.close()
+
+def update_employee(name, email):
+
+    conn = sqlite3.connect("employees.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE employees
+        SET email=?
+        WHERE LOWER(employee_name)=LOWER(?)
+    """, (email, name))
+
+    conn.commit()
+    conn.close()
+
+def delete_employee(name):
+
+    conn = sqlite3.connect("employees.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        DELETE FROM employees
+        WHERE LOWER(employee_name)=LOWER(?)
+    """, (name,))
+
+    conn.commit()
+    conn.close()
 
 
 # ---------------------------
@@ -89,7 +106,7 @@ def extract_tasks(file):
         "FFB7B7B7": "Due",
         "FF999999": "Due",
         "FF6FA8DC": "Half-Done",
-        "FF0000": "Redo",
+        "FFFF0000": "Redo",
         "FFE84499": "Late",
         "FFBF8E00": "On Hold",
         "FF00FFFF": "Almost Ready",
@@ -163,12 +180,11 @@ def send_to_n8n(
     updates=None,
     email=""
 ):
-
+    
     emails = []
-
     for employee in employees:
-        employee_email = EMPLOYEE_EMAILS.get(employee.title())
-
+        employee_email = get_employee_email(employee)
+        
         if employee_email:
             emails.append(employee_email)
 
@@ -185,6 +201,9 @@ def send_to_n8n(
         "updates": updates or [],
         "excel_path": os.path.abspath(excel_path).replace("\\", "/")
     }
+
+    print("===== N8N PAYLOAD =====")
+    print(payload)
 
     res = requests.post(N8N_WEBHOOK, json=payload)
 
@@ -204,7 +223,7 @@ def find_task_details(excel_path, task_name):
         "FFB7B7B7",
         "FF999999",
         "FF6FA8DC",
-        "FF0000",
+        "FFFF0000",
         "FFE84499",
         "FFBF8E00",
         "FF00FFFF",
@@ -236,7 +255,7 @@ def find_task_details(excel_path, task_name):
     emails = []
 
     for emp in employees:
-        email = EMPLOYEE_EMAILS.get(emp)
+        email = get_employee_email(emp)
 
         if email:
             emails.append(email)
@@ -417,6 +436,19 @@ def dashboard():
     unique_tasks = set()
     status_counts = {}
     status_colors = {}
+    
+    if DB:
+        wb = load_workbook(DB[0]["path"])
+        ws = wb.active
+
+        headers = [cell.value for cell in ws[1]]
+
+        open_col = headers.index("Open")
+        
+        for employee in headers[2:open_col]:
+            if employee:
+                employee_counts.setdefault(employee, 0)
+                employee_status.setdefault(employee, {})
 
     print("===== DASHBOARD =====")
             
@@ -486,7 +518,7 @@ Do not return markdown.
 Do not return explanations.
 Your response must always be JSON.
 
-If the employee wants to CREATE a task return:
+If the user wants to CREATE a task return:
 
 {
     "action":"create",
@@ -496,14 +528,14 @@ If the employee wants to CREATE a task return:
     "close":""
 }
 
-If the employee wants to DELETE a task return:
+If the user wants to DELETE a task return:
 
 {
     "action":"delete",
     "task":""
 }
 
-If the employee wants to update ONE field:
+If the user wants to update ONE field:
 
 {
   "action":"update",
@@ -523,6 +555,21 @@ If the user wants to ADD an employee return:
   "action":"add_employee",
   "employee":"",
   "email":""
+}
+
+If the user wants to update an employee email, return:
+
+{
+    "action":"update_employee",
+    "name":"",
+    "email":""
+}
+
+If the user wants to delete an employee, return:
+
+{
+    "action":"delete_employee",
+    "name":""
 }
 
 If the user wants to update MULTIPLE fields:
@@ -637,10 +684,10 @@ Otherwise return:
             employees = [command_json["employee"]]
         else:
             details = find_task_details(
-            excel_path,
-            task
-        )
-        employees = details["employees"]
+                excel_path,
+                task
+            )
+            employees = details["employees"]
         
         success = True
         performed_updates = []
@@ -653,30 +700,31 @@ Otherwise return:
                 "field": update["field"],
                 "value": update["value"],
                 "employees": employees,
+                "selected_employee": command_json.get("employee", ""),
                 "excel_path": excel_path
-            }
-        )
+                }
+                )
         
-        if response.status_code == 200:
-            performed_updates.append({
+            if response.status_code == 200:
+                performed_updates.append({
                 "field": update["field"],
                 "value": update["value"]
                 })
-        else:
-            success = False
+            else:
+                success = False
             
         if success:
             send_to_n8n(
-            action="notify_update",
-            task=task,
-            employees=employees,
-            open_date="",
-            close_date="",
-            excel_path=excel_path,
-            updates=performed_updates
-            )
-        
-        return jsonify({
+                action="update",
+                task=task,
+                employees=employees,
+                open_date="",
+                close_date="",
+                excel_path=excel_path,
+                updates=performed_updates
+                )
+            
+            return jsonify({
             "answer": f"Task '{task}' updated successfully and employee notified."
             })
         return jsonify({
@@ -688,17 +736,32 @@ Otherwise return:
         # ====================================================
             
     elif command_json["action"] == "add_employee":
-        success = send_to_n8n(
-        action="add_employee",
-        task="",
-        employees=[command_json["employee"]],
-        open_date="",
-        close_date="",
-        excel_path=excel_path,
-        email=command_json["email"]
-    )
         
-        if success:
+        add_employee_db(
+            command_json["employee"],
+            command_json["email"]
+            )
+        
+        response = requests.post(
+            "http://localhost:5000/add-employee",
+            json={
+                "employee": command_json["employee"],
+                "email": command_json["email"],
+                "excel_path": excel_path
+                }
+        )
+
+        if response.status_code == 200:
+            send_to_n8n(
+                action="welcome_employee",
+                task="",
+                employees=[command_json["employee"]],
+                open_date="",
+                close_date="",
+                excel_path=excel_path
+                )
+        
+    
             return jsonify({
                 "answer": f"{command_json['employee']} added successfully."
                 })
@@ -1025,9 +1088,6 @@ def add_employee():
     employee = data["employee"]
     email = data["email"]
     excel_path = data["excel_path"].replace("\\", "/")
-
-    # Save employee email
-    EMPLOYEE_EMAILS[employee] = email
 
     wb = load_workbook(excel_path)
     ws = wb.active

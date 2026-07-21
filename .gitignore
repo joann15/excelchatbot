@@ -9,6 +9,9 @@ venv/
 # Environment variables
 .env
 
+# SQLite database
+employees.db
+
 # VS Code
 .vscode/
 
