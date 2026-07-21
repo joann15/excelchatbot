@@ -30,7 +30,11 @@ for (let file of files) {
         document.getElementById("status").innerText = "Error uploading";
     });
 }
+function downloadExcel() {
 
+    window.open(`${API_URL}/download`, "_blank");
+
+}
 
 // ================= DASHBOARD =================
 function loadDashboard() {

@@ -20,6 +20,7 @@ CORS(app)
 # In-memory DB
 # ---------------------------
 DB = []
+LAST_UPLOADED_FILE = None
 import sqlite3
 
 def get_employee_email(employee):
@@ -292,6 +293,9 @@ def upload():
         filepath = os.path.join("uploads", unique_name)
         
         file.save(filepath)
+
+        global LAST_UPLOADED_FILE
+        LAST_UPLOADED_FILE = filepath
         
         tasks = extract_tasks(filepath)
         
@@ -1140,6 +1144,24 @@ def add_employee():
         "employee": employee,
         "email": email
     })
+
+from flask import send_file
+
+@app.route("/download")
+def download():
+
+    global LAST_UPLOADED_FILE
+
+    if not LAST_UPLOADED_FILE:
+        return jsonify({
+            "error": "No uploaded file."
+        }), 404
+
+    return send_file(
+        LAST_UPLOADED_FILE,
+        as_attachment=True,
+        download_name="Updated_JobCard.xlsx"
+    )
 # ---------------------------
 # RUN
 # ---------------------------
