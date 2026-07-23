@@ -4,6 +4,11 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from openai import OpenAI
 from flask_cors import CORS
+from google_drive import (
+    upload_file,
+    download_file,
+    update_file
+)
 import requests
 from datetime import datetime
 
@@ -165,7 +170,7 @@ def extract_tasks(file):
                 
     return tasks
 
-N8N_WEBHOOK = "http://localhost:5678/webhook/task-manager"
+N8N_WEBHOOK = N8N_WEBHOOK = "https://excelchatbot-n8n-production.up.railway.app/webhook/task-manager"
 
 
 def send_to_n8n(
@@ -174,33 +179,30 @@ def send_to_n8n(
     employees,
     open_date,
     close_date,
-    excel_path,
+    drive_file_id,
     field="",
     value="",
-    selected_employee="",
-    updates=None,
-    email=""
+    updates=None
 ):
     
     emails = []
+
     for employee in employees:
-        employee_email = get_employee_email(employee)
-        
-        if employee_email:
-            emails.append(employee_email)
+        email = get_employee_email(employee)
+    if email:
+        emails.append(email)
 
     payload = {
         "action": action,
         "task": task,
         "employees": employees,
         "emails": emails,
-        "email": email,          
         "open": open_date,
         "close": close_date,
         "field": field,
         "value": value,
         "updates": updates or [],
-        "excel_path": os.path.abspath(excel_path).replace("\\", "/")
+        "drive_file_id": drive_file_id
     }
 
     print("===== N8N PAYLOAD =====")
@@ -293,10 +295,17 @@ def upload():
         filepath = os.path.join("uploads", unique_name)
         
         file.save(filepath)
+        print(filepath)
+        print(os.path.getsize(filepath))
+
+        drive_file_id = upload_file(filepath)
+        print("Uploaded to Google Drive:", drive_file_id)
 
         global LAST_UPLOADED_FILE
+        global LAST_DRIVE_FILE_ID
         LAST_UPLOADED_FILE = filepath
-        
+        LAST_DRIVE_FILE_ID = drive_file_id
+
         tasks = extract_tasks(filepath)
         
         DB.append({
@@ -324,6 +333,8 @@ def upload():
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 @app.route("/update-excel", methods=["POST"])
+
+
 def update_excel():
 
     data = request.json
@@ -334,9 +345,9 @@ def update_excel():
     employees = data["employees"]
     open_date = data["open"]
     close_date = data["close"]
-    excel_path = data["excel_path"].replace("\\", "/")
-
-    wb = load_workbook(excel_path)
+    drive_file_id = data["drive_file_id"]
+    local_file = download_file(drive_file_id)
+    wb = load_workbook(local_file)
     ws = wb.active
 
     headers = [cell.value for cell in ws[1]]
@@ -394,39 +405,36 @@ def update_excel():
             start_color="FF7A3F00",
             end_color="FF7A3F00")
 
-    wb.save(excel_path)
+    wb.save(local_file)
+    update_file(drive_file_id, local_file)
 
     
-    new_tasks = extract_tasks(excel_path)
+    new_tasks = extract_tasks(local_file)
     
     print("New tasks extracted:", len(new_tasks))
     for t in new_tasks[-5:]:
         print(t)
     
-    print("Excel path received:", excel_path)
-    
-    for doc in DB:
-        print("DB path:", doc["path"])
-        
-        if os.path.abspath(doc["path"]) == os.path.abspath(excel_path):
-            print("MATCH FOUND")
-            print("Before:", len(doc["tasks"]))
-            
-            doc["tasks"] = new_tasks
-            
-            print("After:", len(doc["tasks"]))
-            break
+    print("Downloaded file:", local_file)
 
-    print("Excel updated!")
+    if DB:
+        DB[0]["tasks"] = new_tasks
 
-    return jsonify({
-    "success": True,
-    "task": task,
-    "employees": employees,
-    "emails": data.get("emails", []),
-    "open": open_date,
-    "close": close_date
-})
+        print("Excel updated!")
+
+        try:
+            os.remove(local_file)
+        except Exception as e:
+            print("Couldn't delete temporary file:", e)
+
+        return jsonify({
+            "success": True,
+            "task": task,
+            "employees": employees,
+            "emails": data.get("emails", []),
+            "open": open_date,
+            "close": close_date
+            })
 
 
 # ---------------------------
@@ -640,7 +648,7 @@ Otherwise return:
             command_json.get("employees", []),
             command_json.get("open", ""),
             command_json.get("close", ""),
-            excel_path
+            LAST_DRIVE_FILE_ID
         )
 
         if success:
@@ -665,7 +673,7 @@ Otherwise return:
             [],
             "",
             "",
-            excel_path
+            LAST_DRIVE_FILE_ID
         )
 
         if success:
@@ -687,10 +695,12 @@ Otherwise return:
         if command_json.get("employee"):
             employees = [command_json["employee"]]
         else:
+            local_file = download_file(LAST_DRIVE_FILE_ID)
             details = find_task_details(
-                excel_path,
-                task
-            )
+            local_file,
+            task
+        )
+            os.remove(local_file)
             employees = details["employees"]
         
         success = True
@@ -698,14 +708,14 @@ Otherwise return:
         
         for update in updates:
             response = requests.post(
-            "http://localhost:5000/update-task",
+            "https://excelchatbot.onrender.com/update-task",
             json={
                 "task": task,
                 "field": update["field"],
                 "value": update["value"],
                 "employees": employees,
                 "selected_employee": command_json.get("employee", ""),
-                "excel_path": excel_path
+                "drive_file_id": LAST_DRIVE_FILE_ID
                 }
                 )
         
@@ -724,7 +734,7 @@ Otherwise return:
                 employees=employees,
                 open_date="",
                 close_date="",
-                excel_path=excel_path,
+                drive_file_id=LAST_DRIVE_FILE_ID,
                 updates=performed_updates
                 )
             
@@ -747,11 +757,11 @@ Otherwise return:
             )
         
         response = requests.post(
-            "http://localhost:5000/add-employee",
+            "https://excelchatbot.onrender.com/add-employee",
             json={
                 "employee": command_json["employee"],
                 "email": command_json["email"],
-                "excel_path": excel_path
+                "drive_file_id": LAST_DRIVE_FILE_ID
                 }
         )
 
@@ -762,7 +772,7 @@ Otherwise return:
                 employees=[command_json["employee"]],
                 open_date="",
                 close_date="",
-                excel_path=excel_path
+                drive_file_id=LAST_DRIVE_FILE_ID
                 )
         
     
@@ -834,39 +844,48 @@ QUESTION
         "answer": res.choices[0].message.content
     })
 
-
 @app.route("/delete-task", methods=["POST"])
 def delete_task():
-
-    print("========== DELETE ==========")
-    print("Headers:", request.headers)
-    print("JSON:", request.get_json(silent=True))
-
     data = request.json
-    task = data.get("task")
-    if not task:
-        return jsonify({
-        "success": False,
-        "message": "No task provided."
-    }), 400
-    excel_path = data["excel_path"].replace("\\", "/")
 
-    wb = load_workbook(excel_path)
+    task = data["task"]
+    drive_file_id = data["drive_file_id"]
+
+    local_file = download_file(drive_file_id)
+
+    wb = load_workbook(local_file)
     ws = wb.active
 
+    deleted = False
+
     for r in range(2, ws.max_row + 1):
-        if ws.cell(r, 2).value == task:
+        if str(ws.cell(r, 2).value).strip().lower() == task.strip().lower():
             ws.delete_rows(r)
+            deleted = True
             break
 
-    wb.save(excel_path)
+    if not deleted:
+        os.remove(local_file)
 
-    new_tasks = extract_tasks(excel_path)
+        return jsonify({
+        "success": False,
+        "message": "Task not found."
+        }), 404
 
-    for doc in DB:
-        if os.path.abspath(doc["path"]) == os.path.abspath(excel_path):
-            doc["tasks"] = new_tasks
-            break
+    wb.save(local_file)
+    update_file(drive_file_id, local_file)
+
+    new_tasks = extract_tasks(local_file)
+
+    if DB:
+        DB[0]["tasks"] = new_tasks
+
+    print(f"Deleted task: {task}")
+
+    try:
+        os.remove(local_file)
+    except Exception as e:
+        print("Couldn't delete temporary file:", e)
 
     return jsonify({
         "success": True,
@@ -876,17 +895,28 @@ def delete_task():
 @app.route("/task-details", methods=["POST"])
 def task_details():
 
-    data=request.json
+    data = request.json
 
-    result=find_task_details(
-        data["excel_path"],
+    drive_file_id = data["drive_file_id"]
+
+    local_file = download_file(drive_file_id)
+
+    result = find_task_details(
+        local_file,
         data["task"]
     )
 
     print(result)
 
-    result["excel_path"] = data["excel_path"]
+    result["drive_file_id"] = drive_file_id
+
+    try:
+        os.remove(local_file)
+    except Exception as e:
+        print("Couldn't delete temporary file:", e)
+
     return jsonify(result)
+
 @app.route("/update-task", methods=["POST"])
 def update_task():
     
@@ -918,9 +948,10 @@ def update_task():
 
     field = field_map.get(field, field)
 
-    excel_path = data["excel_path"].replace("\\", "/")
+    drive_file_id = data["drive_file_id"]
+    local_file = download_file(drive_file_id)
 
-    wb = load_workbook(excel_path)
+    wb = load_workbook(local_file)
     ws = wb.active
 
     headers = [cell.value for cell in ws[1]]
@@ -1059,27 +1090,32 @@ def update_task():
             "message": "Unknown field."
         }), 400
 
-    wb.save(excel_path)
+    wb.save(local_file)
+    update_file(drive_file_id, local_file)
     print("Workbook saved.")
 
     # Refresh dashboard data
-    new_tasks = extract_tasks(excel_path)
+    new_tasks = extract_tasks(local_file)
 
-    for doc in DB:
-        if os.path.abspath(doc["path"]) == os.path.abspath(excel_path):
-            doc["tasks"] = new_tasks
-            break
+    if DB:
+        DB[0]["tasks"] = new_tasks
+        
+
+    try:
+        os.remove(local_file)
+    except Exception as e:
+        print("Couldn't delete temporary file:", e)
 
     print("Task updated!")
 
     return jsonify({
- "success": True,
- "task": task,
- "field": field,
- "value": value,
- "employees": employees,
- "emails": emails
-})
+        "success": True,
+        "task": task,
+        "field": field,
+        "value": value,
+        "employees": employees,
+        "emails": emails
+    })
 
 @app.route("/add-employee", methods=["POST"])
 def add_employee():
@@ -1091,9 +1127,10 @@ def add_employee():
 
     employee = data["employee"]
     email = data["email"]
-    excel_path = data["excel_path"].replace("\\", "/")
+    drive_file_id = data["drive_file_id"]
+    local_file = download_file(drive_file_id)
 
-    wb = load_workbook(excel_path)
+    wb = load_workbook(local_file)
     ws = wb.active
 
     headers = [cell.value for cell in ws[1]]
@@ -1118,26 +1155,29 @@ def add_employee():
     for r in range(2, ws.max_row + 1):
         ws.cell(r, open_col).value = None
 
-    wb.save(excel_path)
+    wb.save(local_file)
+    update_file(drive_file_id, local_file)
+
+    try:
+        os.remove(local_file)
+    except Exception as e:
+        print("Couldn't delete temporary file:", e)
 
     # Refresh dashboard
-    new_tasks = extract_tasks(excel_path)
+    new_tasks = extract_tasks(local_file)
 
-    for doc in DB:
-        if os.path.abspath(doc["path"]) == os.path.abspath(excel_path):
-            doc["tasks"] = new_tasks
-            break
+    if DB:
+        DB[0]["tasks"] = new_tasks
 
     # Notify through n8n
     send_to_n8n(
-        action="add_employee",
-        task="",
-        employees=[employee],
-        open_date="",
-        close_date="",
-        excel_path=excel_path,
-        email=email
-    )
+    action="add_employee",
+    task="",
+    employees=[employee],
+    open_date="",
+    close_date="",
+    drive_file_id=LAST_DRIVE_FILE_ID
+)
 
     return jsonify({
         "success": True,
@@ -1157,8 +1197,10 @@ def download():
             "error": "No uploaded file."
         }), 404
 
+    local_file = download_file(LAST_DRIVE_FILE_ID)
+
     return send_file(
-        LAST_UPLOADED_FILE,
+        local_file,
         as_attachment=True,
         download_name="Updated_JobCard.xlsx"
     )

@@ -22,3 +22,6 @@ uploads/*
 # Operating System
 .DS_Store
 Thumbs.db
+
+service-account.json
+*.json
