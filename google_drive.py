@@ -1,82 +1,54 @@
 import os
-import io
 
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+from google.cloud import storage
 
-SCOPES = ["https://www.googleapis.com/auth/drive"]
+BUCKET_NAME = "excelchatbot-storage"
 
-FOLDER_ID = "1gFQsUKSOc-9wD0LVGWYwi6R9x7tqfLIW"
+SERVICE_ACCOUNT_FILE = "service-account.json"
 
-SERVICE_ACCOUNT_FILE = "service_account.json"
-
-creds = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE,
-    scopes=SCOPES
+client = storage.Client.from_service_account_json(
+    SERVICE_ACCOUNT_FILE
 )
 
-service = build("drive", "v3", credentials=creds)
+bucket = client.bucket(BUCKET_NAME)
 
 
 # ==========================
-# Upload a new file
+# Upload
 # ==========================
+
 def upload_file(filepath):
 
-    file_metadata = {
-        "name": os.path.basename(filepath),
-        "parents": [FOLDER_ID]
-    }
+    blob_name = os.path.basename(filepath)
 
-    media = MediaFileUpload(
-        filepath,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        resumable=False
-    )
+    blob = bucket.blob(blob_name)
 
-    file = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id"
-    ).execute()
+    blob.upload_from_filename(filepath)
 
-    return file["id"]
+    return blob_name
 
 
 # ==========================
-# Download an existing file
+# Download
 # ==========================
-def download_file(file_id):
 
-    request = service.files().get_media(fileId=file_id)
+def download_file(blob_name):
 
-    local_path = f"temp_{file_id}.xlsx"
+    local_path = f"temp_{blob_name}"
 
-    with open(local_path, "wb") as f:
+    blob = bucket.blob(blob_name)
 
-        downloader = MediaIoBaseDownload(f, request)
-
-        done = False
-
-        while not done:
-            status, done = downloader.next_chunk()
+    blob.download_to_filename(local_path)
 
     return local_path
 
 
 # ==========================
-# Update an existing file
+# Update
 # ==========================
-def update_file(file_id, filepath):
 
-    media = MediaFileUpload(
-        filepath,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        resumable=False
-    )
+def update_file(blob_name, filepath):
 
-    service.files().update(
-        fileId=file_id,
-        media_body=media
-    ).execute()
+    blob = bucket.blob(blob_name)
+
+    blob.upload_from_filename(filepath)
