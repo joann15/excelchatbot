@@ -1,39 +1,20 @@
 import os
 import io
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
-SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 FOLDER_ID = "1gFQsUKSOc-9wD0LVGWYwi6R9x7tqfLIW"
 
-creds = None
+SERVICE_ACCOUNT_FILE = "service_account.json"
 
-# Load existing login
-if os.path.exists("token.json"):
-    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-
-# Login if required
-if not creds or not creds.valid:
-
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-
-    else:
-        flow = InstalledAppFlow.from_client_secrets_file(
-            "client_secret.json",
-            SCOPES
-        )
-
-        creds = flow.run_local_server(port=0)
-
-    with open("token.json", "w") as token:
-        token.write(creds.to_json())
+creds = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE,
+    scopes=SCOPES
+)
 
 service = build("drive", "v3", credentials=creds)
 
