@@ -795,14 +795,22 @@ Otherwise return:
     # ====================================================
     elif command_json["action"] == "delete":
 
+        local_file = download_file(LAST_DRIVE_FILE_ID)
+        details = find_task_details(
+            local_file,
+            command_json["task"]
+        )
+        
+        os.remove(local_file)
+
         success = send_to_n8n(
             "delete",
             command_json["task"],
-            [],
+            details["employees"],
             "",
             "",
             LAST_DRIVE_FILE_ID
-        )
+            )
 
         if success:
             return jsonify({
