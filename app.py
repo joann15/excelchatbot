@@ -170,7 +170,7 @@ def extract_tasks(file):
                 
     return tasks
 
-N8N_WEBHOOK = N8N_WEBHOOK = "https://excelchatbot-n8n-production.up.railway.app/webhook/task-manager"
+N8N_WEBHOOK = "https://excelchatbot-n8n-production.up.railway.app/webhook/task-manager"
 
 
 def send_to_n8n(
@@ -189,8 +189,9 @@ def send_to_n8n(
 
     for employee in employees:
         email = get_employee_email(employee)
-    if email:
-        emails.append(email)
+
+        if email:
+            emails.append(email)
 
     payload = {
         "action": action,
@@ -328,11 +329,136 @@ def upload():
         "results": results
     })
 
+@app.route("/create-task", methods=["POST"])
+def create_task():
 
+    try:
+        data = request.json
+
+        print("===== CREATE TASK =====")
+        print(data)
+
+        task = data["task"]
+        employees = data["employees"]
+        open_date = data["open"]
+        close_date = data["close"]
+        drive_file_id = data["drive_file_id"]
+
+        # Download Excel from Drive
+        local_file = download_file(drive_file_id)
+
+        wb = load_workbook(local_file)
+        ws = wb.active
+
+        headers = [cell.value for cell in ws[1]]
+
+        print("Headers:", headers)
+
+        # Find employee columns
+        employee_cols = []
+
+        for employee in employees:
+            found = False
+
+            for i, header in enumerate(headers):
+                if header and employee.lower() in str(header).lower():
+                    employee_cols.append(i + 1)
+                    found = True
+                    break
+
+            if not found:
+                return jsonify({
+                    "error": f"Employee '{employee}' not found"
+                }), 400
+
+
+        # Find empty row
+        new_row = ws.max_row + 1
+
+        for r in range(2, ws.max_row + 1):
+            if ws.cell(r, 2).value is None:
+                new_row = r
+                break
+
+
+        # Task column
+        task_col = 2
+
+        open_col = headers.index("Open") + 1
+        close_col = headers.index("Close") + 1
+
+
+        # Insert task
+        ws.cell(new_row, task_col).value = task
+
+
+        open_dt = datetime.strptime(open_date, "%Y-%m-%d")
+        close_dt = datetime.strptime(close_date, "%Y-%m-%d")
+
+
+        ws.cell(new_row, open_col).value = open_dt
+        ws.cell(new_row, close_col).value = close_dt
+
+
+        ws.cell(new_row, open_col).number_format = "dd-mmm"
+        ws.cell(new_row, close_col).number_format = "dd-mmm"
+
+
+        # Assign employees
+        for col in employee_cols:
+
+            cell = ws.cell(new_row, col)
+
+            cell.value = 1
+
+            cell.fill = PatternFill(
+                fill_type="solid",
+                start_color="FF7A3F00",
+                end_color="FF7A3F00"
+            )
+
+
+        wb.save(local_file)
+
+
+        # Upload updated Excel
+        update_file(
+            drive_file_id,
+            local_file
+        )
+
+
+        # Refresh chatbot memory
+        new_tasks = extract_tasks(local_file)
+
+        if DB:
+            DB[0]["tasks"] = new_tasks
+
+
+        os.remove(local_file)
+
+
+        print("CREATE SUCCESS")
+
+
+        return jsonify({
+            "success": True,
+            "task": task,
+            "employees": employees
+        })
+
+
+    except Exception as e:
+
+        print("CREATE ERROR:", e)
+
+        return jsonify({
+            "error": str(e)
+        }),500
+    
 # update excel
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
-@app.route("/create-excel", methods=["POST"])
+
 @app.route("/update-excel", methods=["POST"])
 def update_excel():
 
@@ -400,7 +526,7 @@ def update_excel():
         cell = ws.cell(new_row, col)
         
         cell.value = 1
-        
+
         cell.fill = PatternFill(
             fill_type="solid",
             start_color="FF7A3F00",
