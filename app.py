@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 from openai import OpenAI
 from flask_cors import CORS
@@ -10,6 +10,7 @@ from google_drive import (
     update_file
 )
 import requests
+from openpyxl.styles import PatternFill
 from datetime import datetime
 
 load_dotenv(override=True)
