@@ -332,10 +332,11 @@ def upload():
 # update excel
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+@app.route("/create-excel", methods=["POST"])
 @app.route("/update-excel", methods=["POST"])
-
-
 def update_excel():
+
+
 
     data = request.json
 
@@ -1165,6 +1166,207 @@ def add_employee():
 
     # Refresh dashboard
     new_tasks = extract_tasks(local_file)
+
+    
+@app.route("/update-task", methods=["POST"])
+def update_task():
+    
+    data = request.json
+    
+    print("========== UPDATE ==========")
+    print(data)
+    
+    task = data["task"]
+    field = data["field"].lower()
+    value = data["value"]
+    employees = data.get("employees", [])
+    employee = data.get("selected_employee", "")
+    emails = data.get("emails", [])
+   
+
+    print("Task:", task)
+    print("Field:", field)
+    print("Value:", value)
+    print("Employees:", employees)
+    print("Employee selected:", employee)
+
+
+    field_map = {
+        "name": "task",
+        "opendate": "open",
+        "closedate": "close"
+    }
+
+    field = field_map.get(field, field)
+
+    drive_file_id = data["drive_file_id"]
+    local_file = download_file(drive_file_id)
+
+    wb = load_workbook(local_file)
+    ws = wb.active
+
+    headers = [cell.value for cell in ws[1]]
+
+    open_col = headers.index("Open") + 1
+    close_col = headers.index("Close") + 1
+
+    # -----------------------
+    # Find task row
+    # -----------------------
+
+    task_row = None
+
+    for r in range(2, ws.max_row + 1):
+        if str(ws.cell(r, 2).value).strip().lower() == task.strip().lower():
+            task_row = r
+            break
+
+    if task_row is None:
+        return jsonify({
+            "success": False,
+            "message": "Task not found."
+        }), 404
+
+    # ==================================================
+    # STATUS UPDATE
+    # ==================================================
+
+    if field == "status":
+
+        status_colors = {
+            "done": "FF6AA84F",
+            "due": "FFB7B7B7",
+            "half-done": "FF6FA8DC",
+            "redo": "FFFF0000",
+            "late": "FFE84499",
+            "on hold": "FFBF8E00",
+            "almost ready": "FF00FFFF",
+            "just started": "FF7A3F00",
+            "na": "FFFFF2CC"
+        }
+
+        if value.lower() not in status_colors:
+            return jsonify({
+                "success": False,
+                "message": "Unknown status."
+            }), 400
+
+        fill = PatternFill(
+            fill_type="solid",
+            start_color=status_colors[value.lower()],
+            end_color=status_colors[value.lower()]
+        )
+
+        # ----------------------------
+        # If employee specified
+        # ----------------------------
+
+        if employee:
+
+            employee_col = None
+
+            for i, header in enumerate(headers):
+                print(i + 1, header)
+                
+                if header is None:
+                    continue
+                
+                if employee.lower() in str(header).lower():
+                    employee_col = i + 1
+                    
+                    print("Matched employee column:", employee_col)
+                    break
+
+            if employee_col is None:
+                return jsonify({
+                    "success": False,
+                    "message": "Employee not found."
+                }), 404
+
+            cell = ws.cell(task_row, employee_col)
+
+            if cell.value is not None:
+                print("Old color:", cell.fill.start_color.rgb)
+                print("Updating cell:", task_row, employee_col)
+                cell.fill = fill
+                print("New color:", cell.fill.start_color.rgb)
+
+        # ----------------------------
+        # Otherwise update everyone
+        # ----------------------------
+
+        else:
+
+            for c in range(3, open_col):
+
+                cell = ws.cell(task_row, c)
+
+                if cell.value is not None:
+                    cell.fill = fill
+
+    # ==================================================
+    # TASK NAME
+    # ==================================================
+
+    elif field == "task":
+
+        ws.cell(task_row, 2).value = value
+
+    # ==================================================
+    # OPEN DATE
+    # ==================================================
+
+    elif field == "open":
+
+        dt = datetime.strptime(value, "%Y-%m-%d")
+
+        ws.cell(task_row, open_col).value = dt
+        ws.cell(task_row, open_col).number_format = "dd-mmm"
+
+    # ==================================================
+    # CLOSE DATE
+    # ==================================================
+
+    elif field == "close":
+
+        dt = datetime.strptime(value, "%Y-%m-%d")
+
+        ws.cell(task_row, close_col).value = dt
+        ws.cell(task_row, close_col).number_format = "dd-mmm"
+
+    else:
+
+        return jsonify({
+            "success": False,
+            "message": "Unknown field."
+        }), 400
+
+    wb.save(local_file)
+    update_file(drive_file_id, local_file)
+    print("Workbook saved.")
+
+    # Refresh dashboard data
+    new_tasks = extract_tasks(local_file)
+
+    if DB:
+        DB[0]["tasks"] = new_tasks
+        
+
+    try:
+        os.remove(local_file)
+    except Exception as e:
+        print("Couldn't delete temporary file:", e)
+
+    print("Task updated!")
+
+    return jsonify({
+        "success": True,
+        "task": task,
+        "field": field,
+        "value": value,
+        "employees": employees,
+        "emails": emails
+    })
 
     if DB:
         DB[0]["tasks"] = new_tasks
