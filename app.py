@@ -42,7 +42,7 @@ def init_employee_db():
 
     conn.commit()
     conn.close()
-    init_employee_db()
+init_employee_db()
 
 def get_employee_email(employee):
     conn = sqlite3.connect("employees.db")
@@ -1265,7 +1265,6 @@ def update_task():
         "employees": employees,
         "emails": emails
     })
-
 @app.route("/add-employee", methods=["POST"])
 def add_employee():
 
@@ -1277,6 +1276,7 @@ def add_employee():
     employee = data["employee"]
     email = data["email"]
     drive_file_id = data["drive_file_id"]
+
     local_file = download_file(drive_file_id)
 
     wb = load_workbook(local_file)
@@ -1289,10 +1289,14 @@ def add_employee():
 
     # Prevent duplicate employee
     if employee in headers:
+        os.remove(local_file)
         return jsonify({
             "success": False,
             "message": "Employee already exists."
         })
+
+    # Save email in database
+    add_employee_db(employee, email)
 
     # Insert new employee column BEFORE Open
     ws.insert_cols(open_col)
@@ -1307,14 +1311,21 @@ def add_employee():
     wb.save(local_file)
     update_file(drive_file_id, local_file)
 
+    # Refresh dashboard
+    new_tasks = extract_tasks(local_file)
+
+    if DB:
+        DB[0]["tasks"] = new_tasks
+
     try:
         os.remove(local_file)
     except Exception as e:
         print("Couldn't delete temporary file:", e)
 
-    # Refresh dashboard
-    new_tasks = extract_tasks(local_file)
-
+    return jsonify({
+        "success": True,
+        "message": f"{employee} added successfully."
+    })
  
 @app.route("/download")
 def download():
