@@ -1027,31 +1027,29 @@ def delete_task():
         "success": True,
         "message": f"{task} deleted."
     })
-
 @app.route("/task-details", methods=["POST"])
 def task_details():
-
-    data = request.json
-
-    drive_file_id = data["drive_file_id"]
-
-    local_file = download_file(drive_file_id)
-
-    result = find_task_details(
-        local_file,
-        data["task"]
-    )
-
-    print(result)
-
-    result["drive_file_id"] = drive_file_id
-
     try:
-        os.remove(local_file)
-    except Exception as e:
-        print("Couldn't delete temporary file:", e)
+        data = request.json
+        print("TASK DETAILS:", data)
 
-    return jsonify(result)
+        drive_file_id = data["drive_file_id"]
+
+        local_file = download_file(drive_file_id)
+
+        result = find_task_details(local_file, data["task"])
+
+        print(result)
+
+        result["drive_file_id"] = drive_file_id
+
+        os.remove(local_file)
+
+        return jsonify(result)
+
+    except Exception as e:
+        print("TASK DETAILS ERROR:", e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/update-task", methods=["POST"])
 def update_task():
