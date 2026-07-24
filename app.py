@@ -46,16 +46,13 @@ init_employee_db()
 
 def get_employee_email(employee):
     conn = sqlite3.connect("employees.db")
-
     cur = conn.cursor()
-
-    first_name = employee.split()[0]
 
     cur.execute("""
         SELECT email
         FROM employees
         WHERE LOWER(employee_name)=LOWER(?)
-    """, (first_name,))
+    """, (employee.strip(),))
 
     row = cur.fetchone()
     conn.close()
@@ -270,16 +267,14 @@ def find_task_details(excel_path, task_name):
 
 
             break
-
-
-    emails = []
-
+    emails = []    
     for emp in employees:
         email = get_employee_email(emp)
 
+        print(emp, "->", email)
+
         if email:
             emails.append(email)
-
 
     return {
         "task": task_name,
