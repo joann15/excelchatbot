@@ -44,39 +44,31 @@ def init_employee_db():
     conn.close()
 init_employee_db()
 
-
-def get_employee_email(employee_names):
+def get_employee_email(employee):
 
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
-    emails = []
+    first_name = employee.split()[0]
 
-    for employee in employee_names:
+    cursor.execute(
+        """
+        SELECT email 
+        FROM employees
+        WHERE employee_name=?
+        """,
+        (first_name,)
+    )
 
-        first_name = employee.split()[0]
-
-        cursor.execute(
-            """
-            SELECT email 
-            FROM employees 
-            WHERE LOWER(employee_name)=LOWER(?)
-            """,
-            (first_name,)
-        )
-
-        row = cursor.fetchone()
-
-        print(employee, "->", row)
-
-        if row:
-            emails.append(row[0])
-        else:
-            emails.append("")
+    row = cursor.fetchone()
 
     conn.close()
 
-    return emails
+    if row:
+        return row[0]
+
+    return ""
+
 def add_employee_db(name, email):
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
@@ -1004,37 +996,35 @@ QUESTION
     return jsonify({
         "answer": res.choices[0].message.content
     })
+def get_employee_email(employee):
 
-def get_employee_emails(employee_names):
+    if not employee:
+        return ""
+
+    first_name = employee.split()[0]
 
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
-    emails = []
+    cursor.execute(
+        """
+        SELECT email
+        FROM employees
+        WHERE LOWER(employee_name)=LOWER(?)
+        """,
+        (first_name,)
+    )
 
-    for employee in employee_names:
+    row = cursor.fetchone()
 
-        cursor.execute(
-            """
-            SELECT email 
-            FROM employees 
-            WHERE employee_name=?
-            """,
-            (employee,)
-        )
-
-        row = cursor.fetchone()
-
-        print(employee, "->", row)
-
-        if row:
-            emails.append(row[0])
-        else:
-            emails.append("")
+    print("DB SEARCH:", first_name, "RESULT:", row)
 
     conn.close()
 
-    return emails
+    if row:
+        return row[0]
+
+    return ""
 
 @app.route("/delete-task", methods=["POST"])
 def delete_task():
@@ -1049,7 +1039,7 @@ def delete_task():
     task_details = find_task_details(local_file, task)
 
     employees = task_details.get("employees", [])
-    emails = get_employee_emails(employees)
+    emails = [get_employee_email(emp) for emp in employees]
 
     wb = load_workbook(local_file)
     ws = wb.active
@@ -1106,7 +1096,7 @@ def task_details():
 
         employee_names = result.get("employees", [])
 
-        emails = get_employee_emails(employee_names)
+        emails = [get_employee_email(emp) for emp in employee_names]
 
         result["emails"] = emails
 
