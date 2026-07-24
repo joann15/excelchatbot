@@ -999,6 +999,12 @@ def delete_task():
 
     local_file = download_file(drive_file_id)
 
+    # Get assigned employees BEFORE deleting the task
+    task_details = find_task_details(local_file, task)
+
+    employees = task_details.get("employees", [])
+    emails = get_employee_emails(employees)
+
     wb = load_workbook(local_file)
     ws = wb.active
 
@@ -1014,8 +1020,8 @@ def delete_task():
         os.remove(local_file)
 
         return jsonify({
-        "success": False,
-        "message": "Task not found."
+            "success": False,
+            "message": "Task not found."
         }), 404
 
     wb.save(local_file)
@@ -1035,8 +1041,35 @@ def delete_task():
 
     return jsonify({
         "success": True,
-        "message": f"{task} deleted."
+        "message": f"{task} deleted.",
+        "employees": employees,
+        "emails": emails
     })
+
+def get_employee_emails(employee_names):
+
+    conn = sqlite3.connect("employees.db")
+    cursor = conn.cursor()
+
+    emails = []
+
+    for employee in employee_names:
+
+        cursor.execute(
+            "SELECT email FROM employees WHERE name=?",
+            (employee,)
+        )
+
+        row = cursor.fetchone()
+
+        if row:
+            emails.append(row[0])
+        else:
+            emails.append("")
+
+    conn.close()
+
+    return emails
 @app.route("/task-details", methods=["POST"])
 def task_details():
     try:
@@ -1049,7 +1082,11 @@ def task_details():
 
         result = find_task_details(local_file, data["task"])
 
-        print(result)
+        employee_names = result.get("employees", [])
+
+        emails = get_employee_emails(employee_names)
+
+        result["emails"] = emails
 
         result["drive_file_id"] = drive_file_id
 
@@ -1060,7 +1097,7 @@ def task_details():
     except Exception as e:
         print("TASK DETAILS ERROR:", e)
         return jsonify({"error": str(e)}), 500
-
+    
 @app.route("/update-task", methods=["POST"])
 def update_task():
     
