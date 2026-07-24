@@ -1056,7 +1056,7 @@ def get_employee_emails(employee_names):
     for employee in employee_names:
 
         cursor.execute(
-            "SELECT email FROM employees WHERE name=?",
+            "SELECT email FROM employees WHERE employee_name=?",
             (employee,)
         )
 
