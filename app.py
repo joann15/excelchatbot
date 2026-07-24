@@ -990,6 +990,37 @@ QUESTION
         "answer": res.choices[0].message.content
     })
 
+def get_employee_emails(employee_names):
+
+    conn = sqlite3.connect("employees.db")
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM employees")
+    print("DATABASE CONTENT:", cursor.fetchall())
+
+    emails = []
+
+    for employee in employee_names:
+        print("SEARCHING FOR:", employee)
+
+        cursor.execute(
+            "SELECT email FROM employees WHERE employee_name=?",
+            (employee,)
+        )
+
+        row = cursor.fetchone()
+
+        print("RESULT:", row)
+
+        if row:
+            emails.append(row[0])
+        else:
+            emails.append("")
+
+    conn.close()
+
+    return emails
+
 @app.route("/delete-task", methods=["POST"])
 def delete_task():
     data = request.json
@@ -1046,30 +1077,6 @@ def delete_task():
         "emails": emails
     })
 
-def get_employee_emails(employee_names):
-
-    conn = sqlite3.connect("employees.db")
-    cursor = conn.cursor()
-
-    emails = []
-
-    for employee in employee_names:
-
-        cursor.execute(
-            "SELECT email FROM employees WHERE employee_name=?",
-            (employee,)
-        )
-
-        row = cursor.fetchone()
-
-        if row:
-            emails.append(row[0])
-        else:
-            emails.append("")
-
-    conn.close()
-
-    return emails
 @app.route("/task-details", methods=["POST"])
 def task_details():
     try:
