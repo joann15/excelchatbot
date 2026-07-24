@@ -995,22 +995,22 @@ def get_employee_emails(employee_names):
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM employees")
-    print("DATABASE CONTENT:", cursor.fetchall())
-
     emails = []
 
     for employee in employee_names:
-        print("SEARCHING FOR:", employee)
 
         cursor.execute(
-            "SELECT email FROM employees WHERE employee_name=?",
+            """
+            SELECT email 
+            FROM employees 
+            WHERE employee_name=?
+            """,
             (employee,)
         )
 
         row = cursor.fetchone()
 
-        print("RESULT:", row)
+        print(employee, "->", row)
 
         if row:
             emails.append(row[0])
