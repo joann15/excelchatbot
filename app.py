@@ -44,24 +44,39 @@ def init_employee_db():
     conn.close()
 init_employee_db()
 
-def get_employee_email(employee):
+
+def get_employee_email(employee_names):
+
     conn = sqlite3.connect("employees.db")
-    cur = conn.cursor()
+    cursor = conn.cursor()
 
-    cur.execute("""
-        SELECT email
-        FROM employees
-        WHERE LOWER(employee_name)=LOWER(?)
-    """, (employee.strip(),))
+    emails = []
 
-    row = cur.fetchone()
+    for employee in employee_names:
+
+        first_name = employee.split()[0]
+
+        cursor.execute(
+            """
+            SELECT email 
+            FROM employees 
+            WHERE LOWER(employee_name)=LOWER(?)
+            """,
+            (first_name,)
+        )
+
+        row = cursor.fetchone()
+
+        print(employee, "->", row)
+
+        if row:
+            emails.append(row[0])
+        else:
+            emails.append("")
+
     conn.close()
 
-    if row:
-        return row[0]
-
-    return None
-
+    return emails
 def add_employee_db(name, email):
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()

@@ -5,9 +5,7 @@ cursor = conn.cursor()
 
 cursor.execute("SELECT * FROM employees")
 
-rows = cursor.fetchall()
-
-for row in rows:
+for row in cursor.fetchall():
     print(row)
 
 conn.close()
