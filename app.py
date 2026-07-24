@@ -29,11 +29,26 @@ DB = []
 LAST_UPLOADED_FILE = None
 import sqlite3
 
+def init_employee_db():
+    conn = sqlite3.connect("employees.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS employees (
+            employee_name TEXT PRIMARY KEY,
+            email TEXT NOT NULL
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+    init_employee_db()
+
 def get_employee_email(employee):
     conn = sqlite3.connect("employees.db")
+
     cur = conn.cursor()
 
-    # Extract first name from "Tanvi B" -> "Tanvi"
     first_name = employee.split()[0]
 
     cur.execute("""
