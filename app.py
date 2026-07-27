@@ -664,11 +664,13 @@ def dashboard():
 from collections import defaultdict
 @app.route("/chat", methods=["POST"])
 def chat():
+    print("===== CHAT ENDPOINT HIT =====")
     try:
         # -------------------------
         # STEP 1 - Get employee message
         # -------------------------
         query = request.json.get("message", "")
+        print("User message:", query)
 
         # -------------------------
         # STEP 2 - Let GPT determine
