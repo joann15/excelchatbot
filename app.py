@@ -664,7 +664,11 @@ def dashboard():
 from collections import defaultdict
 @app.route("/chat", methods=["POST"])
 def chat():
-    print("===== CHAT ENDPOINT HIT =====")
+
+    print("========== CHAT HIT ==========")
+    print("DB SIZE:", len(DB))
+    print("DRIVE ID:", LAST_DRIVE_FILE_ID)
+
     try:
         # -------------------------
         # STEP 1 - Get employee message
