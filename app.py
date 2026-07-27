@@ -20,7 +20,14 @@ key = os.getenv("OPENAI_API_KEY")
 #print("Last 10:", key[-10:])
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "https://excelchatbot-web.onrender.com"
+        ]
+    }
+})
+
 
 # ---------------------------
 # In-memory DB
@@ -232,14 +239,12 @@ def send_to_n8n(
     res = requests.post(N8N_WEBHOOK, json=payload)
 
     return res.status_code == 200
-
 def find_task_details(excel_path, task_name):
 
     wb = load_workbook(excel_path)
     ws = wb.active
 
     headers = [cell.value for cell in ws[1]]
-
     open_col = headers.index("Open")
 
     status_colors = {
@@ -255,26 +260,34 @@ def find_task_details(excel_path, task_name):
         "FFFFF2CC"
     }
 
+    print("Looking for:", task_name)
 
     employees = []
 
-
     for r in range(2, ws.max_row + 1):
 
-        if ws.cell(r,2).value == task_name:
+        excel_task = str(ws.cell(r, 2).value).strip()
+        print("Excel task:", excel_task)
 
-            for c in range(3, open_col+1):
+        if excel_task == task_name.strip():
 
-                cell = ws.cell(r,c)
+            print("FOUND TASK:", excel_task)
 
+            for c in range(3, open_col + 1):
+
+                cell = ws.cell(r, c)
                 color = str(cell.fill.start_color.rgb)
 
                 if color in status_colors:
-                    employees.append(headers[c-1])
-
+                    print("Employee:", headers[c - 1], "Color:", color)
+                    employees.append(headers[c - 1])
 
             break
-    emails = []    
+
+    print("Employees found:", employees)
+
+    emails = []
+
     for emp in employees:
         email = get_employee_email(emp)
 
@@ -1388,6 +1401,17 @@ def download():
         as_attachment=True,
         download_name="Updated_JobCard.xlsx"
     )
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+
+    print("CHATBOT ERROR:")
+    traceback.print_exc()
+
+    return jsonify({
+        "error": str(e)
+    }), 500
 # ---------------------------
 # RUN
 # ---------------------------
