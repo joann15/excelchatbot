@@ -146,13 +146,23 @@ function sendMessage() {
     .then(res => res.json())
     .then(data => {
 
-    responseBox.innerText = data.answer;
+    console.log("CHAT RESPONSE:", data);
 
-    // Refresh dashboard after task creation
+    if (data.answer) {
+        responseBox.innerText = data.answer;
+    } 
+    else if (data.error) {
+        responseBox.innerText = "Backend error: " + data.error;
+    }
+    else {
+        responseBox.innerText = "Unknown response";
+    }
+
     setTimeout(loadDashboard, 1500);
 
 })
     .catch(err => {
-        responseBox.innerText = "Error getting response";
-    });
+    console.error("CHAT FETCH ERROR:", err);
+    responseBox.innerText = "Network error. Check console.";
+});
 }
