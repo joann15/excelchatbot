@@ -11,6 +11,7 @@ from google_drive import (
 )
 import requests
 import traceback
+import uuid
 from openpyxl.styles import PatternFill
 from datetime import datetime
 
@@ -21,13 +22,14 @@ key = os.getenv("OPENAI_API_KEY")
 #print("Last 10:", key[-10:])
 
 app = Flask(__name__)
-CORS()
+CORS(app)
 
 # ---------------------------
 # In-memory DB
 # ---------------------------
 DB = []
 LAST_UPLOADED_FILE = None
+LAST_DRIVE_FILE_ID = None
 import sqlite3
 
 def init_employee_db():
@@ -44,31 +46,6 @@ def init_employee_db():
     conn.commit()
     conn.close()
 init_employee_db()
-
-def get_employee_email(employee):
-
-    conn = sqlite3.connect("employees.db")
-    cursor = conn.cursor()
-
-    first_name = employee.split()[0]
-
-    cursor.execute(
-        """
-        SELECT email 
-        FROM employees
-        WHERE employee_name=?
-        """,
-        (first_name,)
-    )
-
-    row = cursor.fetchone()
-
-    conn.close()
-
-    if row:
-        return row[0]
-
-    return ""
 
 def add_employee_db(name, email):
     conn = sqlite3.connect("employees.db")
@@ -305,54 +282,64 @@ def home():
 # ---------------------------
 @app.route("/upload", methods=["POST"])
 def upload():
-    DB.clear()
 
-    files = request.files.getlist("files")
-    results = []
-    
-    import os
-    import uuid
-    
-    os.makedirs("uploads", exist_ok=True)
-    
-    for file in files:
-        
-        unique_name = f"{uuid.uuid4()}_{file.filename}"
-        filepath = os.path.join("uploads", unique_name)
-        
-        file.save(filepath)
-        print(filepath)
-        print(os.path.getsize(filepath))
+    try:
+        DB.clear()
 
-        drive_file_id = upload_file(filepath)
-        print("Uploaded to Google Drive:", drive_file_id)
+        files = request.files.getlist("files")
+        results = []
 
-        global LAST_UPLOADED_FILE
-        global LAST_DRIVE_FILE_ID
-        LAST_UPLOADED_FILE = filepath
-        LAST_DRIVE_FILE_ID = drive_file_id
+        os.makedirs("uploads", exist_ok=True)
 
-        tasks = extract_tasks(filepath)
-        
-        DB.append({
-        "file": file.filename,
-        "path": filepath,
-        "tasks": tasks
-    })
+        for file in files:
 
-        #print(tasks[:10])
+            unique_name = f"{uuid.uuid4()}_{file.filename}"
+            filepath = os.path.join("uploads", unique_name)
+
+            file.save(filepath)
+
+            print("FILE:", filepath)
+            print("SIZE:", os.path.getsize(filepath))
+
+            drive_file_id = upload_file(filepath)
+
+            print("Drive ID:", drive_file_id)
+
+            global LAST_UPLOADED_FILE
+            global LAST_DRIVE_FILE_ID
+
+            LAST_UPLOADED_FILE = filepath
+            LAST_DRIVE_FILE_ID = drive_file_id
+
+            tasks = extract_tasks(filepath)
+
+            DB.append({
+                "file": file.filename,
+                "path": filepath,
+                "tasks": tasks
+            })
+
+            results.append({
+                "file": file.filename,
+                "tasks_extracted": len(tasks)
+            })
 
 
-        results.append({
-            "file": file.filename,
-            "tasks_extracted": len(tasks)
+        return jsonify({
+            "message": "Uploaded + normalized",
+            "files": len(files),
+            "results": results
         })
 
-    return jsonify({
-        "message": "Uploaded + normalized",
-        "files": len(files),
-        "results": results
-    })
+
+    except Exception as e:
+
+        print("UPLOAD ERROR:")
+        traceback.print_exc()
+
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 @app.route("/create-task", methods=["POST"])
 def create_task():

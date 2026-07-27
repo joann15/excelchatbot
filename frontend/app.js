@@ -3,33 +3,41 @@ let dashboardData = null;
 
 // UPLOAD /
 function uploadFiles() {
-
     const files = document.getElementById("files").files;
-
-let formData = new FormData();
-
-for (let file of files) {
-    formData.append("files", file);
-}
+    let formData = new FormData();
+    
+    for (let file of files) {
+        formData.append("files", file);
+    }
     document.getElementById("status").innerText = "Processing...";
 
     fetch(`${API_URL}/upload`, {
-        method: "POST",
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
+    method: "POST",
+    body: formData
+})
+.then(async res => {
+    console.log("UPLOAD STATUS:", res.status);
+    console.log("UPLOAD HEADERS:", [...res.headers.entries()]);
 
-        document.getElementById("status").innerText =
-            "Uploaded " + data.files + " files";
+    const text = await res.text();
+    console.log("UPLOAD RAW RESPONSE:", text);
 
-        loadDashboard();  
-    })
-    .catch(err => {
-        console.log(err);
-        document.getElementById("status").innerText = "Error uploading";
-    });
+    return JSON.parse(text);
+})
+.then(data => {
+
+    document.getElementById("status").innerText =
+        "Uploaded " + data.files + " files";
+
+    loadDashboard();
+
+})
+.catch(err => {
+    console.error("UPLOAD ERROR:", err);
+    document.getElementById("status").innerText = "Error uploading";
+});
 }
+
 function downloadExcel() {
 
     window.open(`${API_URL}/download`, "_blank");
