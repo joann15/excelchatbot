@@ -21,14 +21,7 @@ key = os.getenv("OPENAI_API_KEY")
 #print("Last 10:", key[-10:])
 
 app = Flask(__name__)
-CORS(app, resources={
-    r"/*": {
-        "origins": [
-            "https://excelchatbot-web.onrender.com"
-        ]
-    }
-})
-
+CORS()
 
 # ---------------------------
 # In-memory DB
@@ -829,11 +822,23 @@ Otherwise return:
             )
 
             print("N8N SUCCESS VALUE:", success)
-
             if success:
+                if isinstance(employees, list):
+                    employee_text = ", ".join(employees)
+                else:
+                    employee_text = str(employees)
+                print("FINAL RESPONSE:", employee_text)
+
+                print("ABOUT TO RETURN CHAT RESPONSE")
+                print({
+    "task": task,
+    "employees": employees,
+    "success": success
+})
+
                 return jsonify({
-                    "answer": f"Task '{task}' assigned to {', '.join(employees) if employees else 'no employees'}."
-                })
+        "answer": f"Task '{task}' assigned to {employee_text}."
+    })
 
             return jsonify({
                 "answer": "Failed to create task."
@@ -1030,15 +1035,15 @@ QUESTION
             "answer": res.choices[0].message.content
         })
     except Exception as e:
-        print("=" * 80)
-        print("CHAT ERROR")
-        print(traceback.format_exc())
-        print("=" * 80)
-
+        print("========== REAL CHAT ERROR ==========")
+        print(type(e))
+        print(str(e))
+        traceback.print_exc()
         return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        "answer": "Backend crashed",
+        "error": str(e)
+    }),500
+
 
 def get_employee_email(employee):
 
@@ -1433,22 +1438,7 @@ def download():
         download_name="Updated_JobCard.xlsx"
     )
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    import traceback
 
-    print("CHATBOT ERROR:")
-    traceback.print_exc()
-
-    response = jsonify({
-        "error": str(e)
-    })
-
-    response.status_code = 500
-
-    response.headers["Access-Control-Allow-Origin"] = "https://excelchatbot-web.onrender.com"
-
-    return response
 # ---------------------------
 # RUN
 # ---------------------------
