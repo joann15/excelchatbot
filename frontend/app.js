@@ -136,7 +136,7 @@ function sendMessage() {
     responseBox.style.display = "block";
     responseBox.innerHTML = "Thinking...";
 
-    fetch(`${API_URL}/chat`, {
+    fetch(`${API_URL}/test-post`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"

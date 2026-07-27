@@ -658,6 +658,13 @@ def dashboard():
     "status_colors": status_colors,
     "employee_status": employee_status
 })
+
+@app.route("/test-post", methods=["POST"])
+def test_post():
+    print("TEST POST HIT")
+    return jsonify({
+        "message": "POST works"
+    })
 # ---------------------------
 # 7. Chat API
 # ---------------------------
@@ -1428,9 +1435,15 @@ def handle_exception(e):
     print("CHATBOT ERROR:")
     traceback.print_exc()
 
-    return jsonify({
+    response = jsonify({
         "error": str(e)
-    }), 500
+    })
+
+    response.status_code = 500
+
+    response.headers["Access-Control-Allow-Origin"] = "https://excelchatbot-web.onrender.com"
+
+    return response
 # ---------------------------
 # RUN
 # ---------------------------
