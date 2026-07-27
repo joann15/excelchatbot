@@ -815,12 +815,13 @@ Otherwise return:
             )
 
             if success:
-                return jsonify({
-                    "answer":
-                    f"Task '{task}' assigned to "
-                    f"{', '.join(employees)}."
-                })
+                if success:
+                    task = command_json.get("task", "Unnamed task")
+                    employees = command_json.get("employees", [])
 
+                    return jsonify({
+                        "answer": f"Task '{task}' assigned to {', '.join(employees) if employees else 'no employees'}."
+                        })
             return jsonify({
                 "answer": "Failed to create task."
             })
