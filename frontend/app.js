@@ -1,7 +1,7 @@
 const API_URL = "https://excelchatbot.onrender.com";
 let dashboardData = null;
 
-// UPLOAD 
+// UPLOAD /
 function uploadFiles() {
 
     const files = document.getElementById("files").files;

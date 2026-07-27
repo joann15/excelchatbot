@@ -10,6 +10,7 @@ from google_drive import (
     update_file
 )
 import requests
+import traceback
 from openpyxl.styles import PatternFill
 from datetime import datetime
 
@@ -661,26 +662,25 @@ def dashboard():
 # 7. Chat API
 # ---------------------------
 from collections import defaultdict
-
 @app.route("/chat", methods=["POST"])
 def chat():
+    try:
+        # -------------------------
+        # STEP 1 - Get employee message
+        # -------------------------
+        query = request.json.get("message", "")
 
-    # -------------------------
-    # STEP 1 - Get employee message
-    # -------------------------
-    query = request.json.get("message", "")
-
-    # -------------------------
-    # STEP 2 - Let GPT determine
-    # what action the employee wants
-    # -------------------------
-    command = client.chat.completions.create(
-        model="gpt-4.1",
-        response_format={"type": "json_object"},
-        messages=[
-            {
-                "role": "system",
-                "content": """
+        # -------------------------
+        # STEP 2 - Let GPT determine
+        # what action the employee wants
+        # -------------------------
+        command = client.chat.completions.create(
+            model="gpt-4.1",
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
 You are a command detector.
 
 Always respond with a valid JSON object.
@@ -769,215 +769,215 @@ Otherwise return:
     "action":"chat"
 }
 """
-            },
-            {
-                "role": "user",
-                "content": query
-            }
-        ]
-    )
-
-    command_json = json.loads(
-        command.choices[0].message.content
-    )
-
-    print("COMMAND:", command_json)
-
-    # -------------------------
-    # Make sure a Job Card exists
-    # -------------------------
-    if command_json["action"] != "chat":
-
-        if len(DB) == 0:
-            return jsonify({
-                "answer": "Please upload a Job Card first."
-            })
-
-        excel_path = DB[0]["path"]
-
-    # ====================================================
-    # CREATE TASK
-    # ====================================================
-    if command_json["action"] == "create":
-
-        success = send_to_n8n(
-            "create",
-            command_json.get("task", ""),
-            command_json.get("employees", []),
-            command_json.get("open", ""),
-            command_json.get("close", ""),
-            LAST_DRIVE_FILE_ID
+                },
+                {
+                    "role": "user",
+                    "content": query
+                }
+            ]
         )
 
-        if success:
-            return jsonify({
-                "answer":
-                f"Task '{command_json['task']}' assigned to "
-                f"{', '.join(command_json['employees'])}."
-            })
-
-        return jsonify({
-            "answer": "Failed to create task."
-        })
-
-    # ====================================================
-    # DELETE TASK
-    # ====================================================
-    elif command_json["action"] == "delete":
-
-        local_file = download_file(LAST_DRIVE_FILE_ID)
-        details = find_task_details(
-            local_file,
-            command_json["task"]
+        command_json = json.loads(
+            command.choices[0].message.content
         )
-        
-        os.remove(local_file)
 
-        success = send_to_n8n(
-            "delete",
-            command_json["task"],
-            details["employees"],
-            "",
-            "",
-            LAST_DRIVE_FILE_ID
+        print("COMMAND:", command_json)
+
+        action = command_json.get("action", "chat")
+
+        # -------------------------
+        # Make sure a Job Card exists
+        # -------------------------
+        if action != "chat":
+
+            if len(DB) == 0:
+                return jsonify({
+                    "answer": "Please upload a Job Card first."
+                })
+
+            excel_path = DB[0]["path"]
+
+        # ====================================================
+        # CREATE TASK
+        # ====================================================
+        if action == "create":
+
+            task = command_json.get("task", "")
+            employees = command_json.get("employees", [])
+
+            success = send_to_n8n(
+                "create",
+                task,
+                employees,
+                command_json.get("open", ""),
+                command_json.get("close", ""),
+                LAST_DRIVE_FILE_ID
             )
 
-        if success:
+            if success:
+                return jsonify({
+                    "answer":
+                    f"Task '{task}' assigned to "
+                    f"{', '.join(employees)}."
+                })
+
             return jsonify({
-                "answer": f"Task '{command_json['task']}' deleted."
+                "answer": "Failed to create task."
             })
 
-        return jsonify({
-            "answer": "Failed to delete task."
-        })
-    
-    # ====================================================
-    # UPDATE TASK
-    # ====================================================
-    elif command_json["action"] == "update":
-        task = command_json["task"]
-        updates = command_json.get("updates", [])
-        
-        if command_json.get("employee"):
-            employees = [command_json["employee"]]
-        else:
+        # ====================================================
+        # DELETE TASK
+        # ====================================================
+        elif action == "delete":
+
+            task = command_json.get("task", "")
+
             local_file = download_file(LAST_DRIVE_FILE_ID)
-            details = find_task_details(
-            local_file,
-            task
-        )
+            details = find_task_details(local_file, task)
             os.remove(local_file)
-            employees = details["employees"]
-        
-        success = True
-        performed_updates = []
-        
-        for update in updates:
-            response = requests.post(
-            "https://excelchatbot.onrender.com/update-task",
-            json={
-                "task": task,
-                "field": update["field"],
-                "value": update["value"],
-                "employees": employees,
-                "selected_employee": command_json.get("employee", ""),
-                "drive_file_id": LAST_DRIVE_FILE_ID
-                }
-                )
-        
-            if response.status_code == 200:
-                performed_updates.append({
-                "field": update["field"],
-                "value": update["value"]
+
+            success = send_to_n8n(
+                "delete",
+                task,
+                details["employees"],
+                "",
+                "",
+                LAST_DRIVE_FILE_ID
+            )
+
+            if success:
+                return jsonify({
+                    "answer": f"Task '{task}' deleted."
                 })
-            else:
-                success = False
-            
-        if success:
-            send_to_n8n(
-                action="update",
-                task=task,
-                employees=employees,
-                open_date="",
-                close_date="",
-                drive_file_id=LAST_DRIVE_FILE_ID,
-                updates=performed_updates
-                )
-            
+
             return jsonify({
-            "answer": f"Task '{task}' updated successfully and employee notified."
+                "answer": "Failed to delete task."
             })
-        return jsonify({
-                "answer": "Failed to update task."
+
+        # ====================================================
+        # UPDATE TASK
+        # ====================================================
+        elif action == "update":
+            task = command_json.get("task", "")
+            updates = command_json.get("updates", [])
+
+            if command_json.get("employee"):
+                employees = [command_json["employee"]]
+            else:
+                local_file = download_file(LAST_DRIVE_FILE_ID)
+                details = find_task_details(local_file, task)
+                os.remove(local_file)
+                employees = details["employees"]
+
+            success = True
+            performed_updates = []
+
+            for update in updates:
+                response = requests.post(
+                    "https://excelchatbot.onrender.com/update-task",
+                    json={
+                        "task": task,
+                        "field": update["field"],
+                        "value": update["value"],
+                        "employees": employees,
+                        "selected_employee": command_json.get("employee", ""),
+                        "drive_file_id": LAST_DRIVE_FILE_ID
+                    },
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    performed_updates.append({
+                        "field": update["field"],
+                        "value": update["value"]
+                    })
+                else:
+                    success = False
+
+            if success:
+                send_to_n8n(
+                    action="update",
+                    task=task,
+                    employees=employees,
+                    open_date="",
+                    close_date="",
+                    drive_file_id=LAST_DRIVE_FILE_ID,
+                    updates=performed_updates
+                )
+
+                return jsonify({
+                    "answer": f"Task '{task}' updated successfully and employee notified."
                 })
-        
+
+            return jsonify({
+                "answer": "Failed to update task."
+            })
+
         # ====================================================
         # ADD EMPLOYEE
         # ====================================================
-            
-    elif command_json["action"] == "add_employee":
-        
-        add_employee_db(
-            command_json["employee"],
-            command_json["email"]
-            )
-        
-        response = requests.post(
-            "https://excelchatbot.onrender.com/add-employee",
-            json={
-                "employee": command_json["employee"],
-                "email": command_json["email"],
-                "drive_file_id": LAST_DRIVE_FILE_ID
-                }
-        )
+        elif action == "add_employee":
 
-        if response.status_code == 200:
-            send_to_n8n(
-                action="welcome_employee",
-                task="",
-                employees=[command_json["employee"]],
-                open_date="",
-                close_date="",
-                drive_file_id=LAST_DRIVE_FILE_ID
+            employee = command_json.get("employee", "")
+            email = command_json.get("email", "")
+
+            add_employee_db(employee, email)
+
+            response = requests.post(
+                "https://excelchatbot.onrender.com/add-employee",
+                json={
+                    "employee": employee,
+                    "email": email,
+                    "drive_file_id": LAST_DRIVE_FILE_ID
+                },
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                send_to_n8n(
+                    action="welcome_employee",
+                    task="",
+                    employees=[employee],
+                    open_date="",
+                    close_date="",
+                    drive_file_id=LAST_DRIVE_FILE_ID
                 )
-        
-    
-            return jsonify({
-                "answer": f"{command_json['employee']} added successfully."
+
+                return jsonify({
+                    "answer": f"{employee} added successfully."
                 })
-            
-        return jsonify({
-            "answer": "Failed to add employee."
+
+            return jsonify({
+                "answer": "Failed to add employee."
             })
 
-    # ====================================================
-    # NORMAL CHAT
-    # ====================================================
-    
-    context = []
+        # ====================================================
+        # NORMAL CHAT
+        # ====================================================
 
-    emp_tasks = defaultdict(dict)
+        context = []
+        emp_tasks = defaultdict(dict)
 
-    for doc in DB:
-        for t in doc["tasks"]:
+        for doc in DB:
+            for t in doc["tasks"]:
 
-            context.append(t)
+                context.append(t)
 
-            emp = t["employee"]
-            task = t["task"]
+                emp = t["employee"]
+                task_name = t["task"]
 
-            emp_tasks[emp][task] = {
-                "status": t["status"],
-                "open": t["open"],
-                "close": t["close"]
-            }
+                emp_tasks[emp][task_name] = {
+                    "status": t["status"],
+                    "open": t["open"],
+                    "close": t["close"]
+                }
 
-    res = client.chat.completions.create(
-        model="gpt-4.1",
-        messages=[
-            {
-                "role": "system",
-                "content": """
+        res = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
 You are an AI Project Assistant.
 
 You answer ONLY from the provided job card data.
@@ -990,10 +990,10 @@ RULES
 4. If nothing matches say:
 "No matching tasks were found."
 """
-            },
-            {
-                "role": "user",
-                "content": f"""
+                },
+                {
+                    "role": "user",
+                    "content": f"""
 JOB CARD DATA
 
 {json.dumps(context, indent=2)}
@@ -1002,13 +1002,25 @@ QUESTION
 
 {query}
 """
-            }
-        ]
-    )
+                }
+            ]
+        )
 
-    return jsonify({
-        "answer": res.choices[0].message.content
-    })
+        return jsonify({
+            "answer": res.choices[0].message.content
+        })
+
+    except Exception as e:
+        print("=" * 80)
+        print("CHAT ERROR")
+        print(traceback.format_exc())
+        print("=" * 80)
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
 def get_employee_email(employee):
 
     if not employee:
