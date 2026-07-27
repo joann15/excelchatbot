@@ -810,9 +810,10 @@ Otherwise return:
 
             excel_path = DB[0]["path"]
 
-        # ====================================================
+              # ====================================================
         # CREATE TASK
         # ====================================================
+
         if action == "create":
 
             task = command_json.get("task", "")
@@ -827,27 +828,33 @@ Otherwise return:
                 LAST_DRIVE_FILE_ID
             )
 
-            if success:
-                if success:
-                    task = command_json.get("task", "Unnamed task")
-                    employees = command_json.get("employees", [])
+            print("N8N SUCCESS VALUE:", success)
 
-                    return jsonify({
-                        "answer": f"Task '{task}' assigned to {', '.join(employees) if employees else 'no employees'}."
-                        })
+            if success:
+                return jsonify({
+                    "answer": f"Task '{task}' assigned to {', '.join(employees) if employees else 'no employees'}."
+                })
+
             return jsonify({
                 "answer": "Failed to create task."
             })
 
+
         # ====================================================
         # DELETE TASK
         # ====================================================
+
         elif action == "delete":
 
             task = command_json.get("task", "")
 
             local_file = download_file(LAST_DRIVE_FILE_ID)
-            details = find_task_details(local_file, task)
+
+            details = find_task_details(
+                local_file,
+                task
+            )
+
             os.remove(local_file)
 
             success = send_to_n8n(
@@ -867,7 +874,6 @@ Otherwise return:
             return jsonify({
                 "answer": "Failed to delete task."
             })
-
         # ====================================================
         # UPDATE TASK
         # ====================================================
@@ -1023,7 +1029,6 @@ QUESTION
         return jsonify({
             "answer": res.choices[0].message.content
         })
-
     except Exception as e:
         print("=" * 80)
         print("CHAT ERROR")
