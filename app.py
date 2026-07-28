@@ -301,6 +301,8 @@ def home():
 
 
 def upload():
+    global LAST_UPLOADED_FILE
+    global LAST_DRIVE_FILE_ID
     print("PID:", os.getpid())
     print("DB SIZE:", len(DB))
     print("DRIVE:", LAST_DRIVE_FILE_ID)
@@ -326,9 +328,6 @@ def upload():
             drive_file_id = upload_file(filepath)
 
             print("Drive ID:", drive_file_id)
-
-            global LAST_UPLOADED_FILE
-            global LAST_DRIVE_FILE_ID
 
             LAST_UPLOADED_FILE = filepath
             LAST_DRIVE_FILE_ID = drive_file_id
