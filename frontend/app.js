@@ -138,6 +138,7 @@ window.workloadChart = new Chart(
 function sendMessage() {
 
     const msg = document.getElementById("msg").value;
+    console.log("Sending message:", msg);
 
     const responseBox = document.getElementById("response");
 
@@ -151,26 +152,51 @@ function sendMessage() {
         },
         body: JSON.stringify({ message: msg })
     })
-    .then(res => res.json())
+    .then(async res => {
+
+        console.log("STATUS:", res.status);
+        console.log("HEADERS:", [...res.headers.entries()]);
+
+        const text = await res.text();
+        if (!res.ok) {
+            console.error("HTTP ERROR:", res.status);
+            console.error(text);
+        }
+
+        console.log("RAW RESPONSE:");
+        console.log(text);
+
+        try {
+            return JSON.parse(text);
+        } catch {
+            throw new Error("Server returned non-JSON:\n" + text);
+        }
+
+    })
     .then(data => {
 
-    console.log("CHAT RESPONSE:", data);
+        console.log("CHAT RESPONSE:", data);
 
-    if (data.answer) {
-        responseBox.innerText = data.answer;
-    } 
-    else if (data.error) {
-        responseBox.innerText = "Backend error: " + data.error;
-    }
-    else {
-        responseBox.innerText = "Unknown response";
-    }
+        if (data.answer) {
+            responseBox.innerText = data.answer;
+        }
+        else if (data.error) {
+            responseBox.innerText = "Backend error: " + data.error;
+        }
+        else {
+            responseBox.innerText = "Unknown response";
+        }
 
-    setTimeout(loadDashboard, 1500);
+        setTimeout(loadDashboard, 1500);
 
-})
+    })
     .catch(err => {
-    console.error("CHAT FETCH ERROR:", err);
-    responseBox.innerText = "Network error. Check console.";
-});
+
+        console.error("CHAT FETCH ERROR:", err);
+
+        responseBox.innerText = err.message;
+
+    });
 }
+    
+   
