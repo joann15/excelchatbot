@@ -298,7 +298,12 @@ def home():
 # 5. Upload endpoint
 # ---------------------------
 @app.route("/upload", methods=["POST"])
+
+
 def upload():
+    print("PID:", os.getpid())
+    print("DB SIZE:", len(DB))
+    print("DRIVE:", LAST_DRIVE_FILE_ID)
 
     try:
         DB.clear()
@@ -675,11 +680,12 @@ def test_post():
 from collections import defaultdict
 @app.route("/chat", methods=["POST"])
 def chat():
-
-    print("========== CHAT HIT ==========")
+    print("PID:", os.getpid())
     print("DB SIZE:", len(DB))
-    print("DRIVE ID:", LAST_DRIVE_FILE_ID)
+    print("DRIVE:", LAST_DRIVE_FILE_ID)
 
+   
+    
     try:
         # -------------------------
         # STEP 1 - Get employee message
