@@ -23,7 +23,11 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 key = os.getenv("OPENAI_API_KEY")
 #print("Last 10:", key[-10:])
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    static_folder="frontend",
+    static_url_path=""
+)
 CORS(app)
 
 # ---------------------------
@@ -121,11 +125,9 @@ def extract_tasks(file):
     }
 
     tasks = []
-    
-    for row in ws.iter_rows(min_row=2):
-       # print([cell.value for cell in row])
-
+    for row_num, row in enumerate(ws.iter_rows(min_row=2), start=2):
         task = row[1].value
+        print("Checking row", row_num, "Task:", task)
         
         employee_cells = [
             row[i].value
@@ -167,8 +169,13 @@ def extract_tasks(file):
     
     if tasks:
         print("Last task:", tasks[-1])
-                
-    return tasks
+
+        print("\n========== EXTRACTED TASKS ==========")
+        for t in tasks[-10:]:
+            print(t)
+        print("Total extracted:", len(tasks))
+
+        return tasks
 
 N8N_WEBHOOK = "https://excelchatbot-n8n-production.up.railway.app/webhook/task-manager"
 
@@ -285,7 +292,7 @@ def find_task_details(excel_path, task_name):
     
 @app.route("/")
 def home():
-    return "Job Card API is running!"
+    return app.send_static_file("index.html")
 
 # ---------------------------
 # 5. Upload endpoint
