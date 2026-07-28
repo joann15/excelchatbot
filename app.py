@@ -15,6 +15,8 @@ import uuid
 from openpyxl.styles import PatternFill
 from datetime import datetime
 
+
+current_year = datetime.now().year
 load_dotenv(override=True)
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -207,9 +209,17 @@ def send_to_n8n(
     print("===== N8N PAYLOAD =====")
     print(payload)
 
-    res = requests.post(N8N_WEBHOOK, json=payload)
+    print("Calling n8n...")
 
+    res = requests.post(
+        N8N_WEBHOOK,
+        json=payload,
+        timeout=120
+    )
+
+    print("Returned from n8n:", res.status_code)
     return res.status_code == 200
+
 def find_task_details(excel_path, task_name):
 
     wb = load_workbook(excel_path)
@@ -343,7 +353,6 @@ def upload():
 
 @app.route("/create-task", methods=["POST"])
 def create_task():
-
     try:
         data = request.json
 
@@ -400,20 +409,27 @@ def create_task():
         close_col = headers.index("Close") + 1
 
 
-        # Insert task
+                # Insert task
         ws.cell(new_row, task_col).value = task
 
 
-        open_dt = datetime.strptime(open_date, "%Y-%m-%d")
-        close_dt = datetime.strptime(close_date, "%Y-%m-%d")
+        open_dt = None
+        close_dt = None
+
+        if open_date:
+            open_dt = datetime.strptime(open_date, "%Y-%m-%d")
+
+        if close_date:
+            close_dt = datetime.strptime(close_date, "%Y-%m-%d")
 
 
-        ws.cell(new_row, open_col).value = open_dt
-        ws.cell(new_row, close_col).value = close_dt
+        if open_dt:
+            ws.cell(new_row, open_col).value = open_dt
+            ws.cell(new_row, open_col).number_format = "dd-mmm"
 
-
-        ws.cell(new_row, open_col).number_format = "dd-mmm"
-        ws.cell(new_row, close_col).number_format = "dd-mmm"
+        if close_dt:
+            ws.cell(new_row, close_col).value = close_dt
+            ws.cell(new_row, close_col).number_format = "dd-mmm"
 
 
         # Assign employees
@@ -459,9 +475,7 @@ def create_task():
             "employees": employees
         })
 
-
     except Exception as e:
-
         print("CREATE ERROR:", e)
 
         return jsonify({
@@ -525,14 +539,17 @@ def update_excel():
 
     ws.cell(new_row, task_col).value = task
 
-    open_dt = datetime.strptime(open_date, "%Y-%m-%d")
-    close_dt = datetime.strptime(close_date, "%Y-%m-%d")
+    if open_date:
+        open_dt = datetime.strptime(open_date, "%Y-%m-%d")
+        ws.cell(new_row, open_col).value = open_dt
+        ws.cell(new_row, open_col).number_format = "dd-mmm"
+
+
+    if close_date:
+        close_dt = datetime.strptime(close_date, "%Y-%m-%d")
+        ws.cell(new_row, close_col).value = close_dt
+        ws.cell(new_row, close_col).number_format = "dd-mmm"
     
-    ws.cell(new_row, open_col).value = open_dt
-    ws.cell(new_row, close_col).value = close_dt
-    
-    ws.cell(new_row, open_col).number_format = "dd-mmm"
-    ws.cell(new_row, close_col).number_format = "dd-mmm"
 
     for col in employee_cols:
         cell = ws.cell(new_row, col)
@@ -680,6 +697,13 @@ Always respond with a valid JSON object.
 Do not return markdown.
 Do not return explanations.
 Your response must always be JSON.
+
+DATE RULES:
+- The current calendar year is {CURRENT_YEAR}.
+- If the user provides only a month and day without a year, always use {CURRENT_YEAR}.
+- If the user explicitly provides a year, always use that year.
+- Never assume a previous year unless the user explicitly mentions it.
+- Convert dates to YYYY-MM-DD format.
 
 If the user wants to CREATE a task return:
 
