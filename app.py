@@ -39,6 +39,7 @@ LAST_DRIVE_FILE_ID = None
 import sqlite3
 
 def init_employee_db():
+    print("Using database:", os.path.abspath("employees.db"))
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
