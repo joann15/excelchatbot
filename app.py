@@ -377,6 +377,20 @@ def create_task():
         close_date = data["close"]
         drive_file_id = data["drive_file_id"]
 
+        emails = []
+        missing_emails = []
+
+        for employee in employees:
+            email = get_employee_email(employee)
+            if email:
+                emails.append(email)
+            else:
+                missing_emails.append(employee)
+                emails.append(None)  # keep index alignment with employees[]
+
+        if missing_emails:
+            print("WARNING: No email found for:", missing_emails)
+
         # Download Excel from Drive
         local_file = download_file(drive_file_id)
 
@@ -484,7 +498,10 @@ def create_task():
         return jsonify({
             "success": True,
             "task": task,
-            "employees": employees
+            "employees": employees,
+            "emails": emails,
+            "open": open_date,
+            "close": close_date
         })
 
     except Exception as e:
