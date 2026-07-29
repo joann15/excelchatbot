@@ -39,7 +39,7 @@ LAST_DRIVE_FILE_ID = None
 import sqlite3
 
 def init_employee_db():
-    print("Using database:", os.path.abspath("employees.db"))
+
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
@@ -1075,7 +1075,8 @@ def get_employee_email(employee):
         return ""
 
     first_name = employee.split()[0]
-
+    
+    print("Using database:", os.path.abspath("employees.db"))
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
