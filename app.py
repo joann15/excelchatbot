@@ -38,9 +38,23 @@ LAST_UPLOADED_FILE = None
 LAST_DRIVE_FILE_ID = None
 import sqlite3
 
+
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DB_PATH = os.path.join(
+    BASE_DIR,
+    "employees.db"
+)
+
+
+def get_db():
+    return sqlite3.connect(DB_PATH)
+
+
 def init_employee_db():
 
-    conn = sqlite3.connect("employees.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -52,6 +66,8 @@ def init_employee_db():
 
     conn.commit()
     conn.close()
+
+
 init_employee_db()
 
 def add_employee_db(name, email):
@@ -60,7 +76,7 @@ def add_employee_db(name, email):
     print("NAME:", name)
     print("EMAIL:", email)
 
-    conn = sqlite3.connect("employees.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute(
@@ -80,7 +96,7 @@ def add_employee_db(name, email):
 
 def update_employee(name, email):
 
-    conn = sqlite3.connect("employees.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -94,7 +110,7 @@ def update_employee(name, email):
 
 def delete_employee(name):
 
-    conn = sqlite3.connect("employees.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -385,28 +401,20 @@ def upload():
 @app.route("/debug-db")
 def debug_db():
 
-    import os
-
-    db_path = os.path.abspath("employees.db")
-
-    conn = sqlite3.connect("employees.db")
+    conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM employees")
-    count = cursor.fetchone()[0]
+    cursor.execute("SELECT * FROM employees")
 
-    cursor.execute("SELECT employee_name, email FROM employees")
     rows = cursor.fetchall()
 
     conn.close()
 
     return jsonify({
-        "db_path": db_path,
-        "db_exists": os.path.exists(db_path),
-        "count": count,
-        "employees": rows
+        "database": DB_PATH,
+        "employees": rows,
+        "count": len(rows)
     })
-
 @app.route("/create-task", methods=["POST"])
 def create_task():
     try:
