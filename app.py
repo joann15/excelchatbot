@@ -14,6 +14,8 @@ import traceback
 import uuid
 from openpyxl.styles import PatternFill
 from datetime import datetime
+import gspread
+from google.oauth2.service_account import Credentials
 
 
 current_year = datetime.now().year
@@ -36,90 +38,26 @@ CORS(app)
 DB = []
 LAST_UPLOADED_FILE = None
 LAST_DRIVE_FILE_ID = None
-import sqlite3
 
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+def get_employee_sheet():
 
-DB_PATH = os.path.join(
-    BASE_DIR,
-    "employees.db"
-)
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
 
-
-def get_db():
-    return sqlite3.connect(DB_PATH)
-
-
-def init_employee_db():
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS employees (
-            employee_name TEXT PRIMARY KEY,
-            email TEXT NOT NULL
-        )
-    """)
-
-    conn.commit()
-    conn.close()
-
-
-init_employee_db()
-
-def add_employee_db(name, email):
-
-    print("===== INSIDE ADD EMPLOYEE DB =====")
-    print("NAME:", name)
-    print("EMAIL:", email)
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        INSERT OR REPLACE INTO employees(employee_name,email)
-        VALUES(?,?)
-        """,
-        (name, email)
+    creds = Credentials.from_service_account_file(
+        "/etc/secrets/service-account.json",
+        scopes=scopes
     )
 
-    conn.commit()
+    client = gspread.authorize(creds)
 
-    cursor.execute("SELECT * FROM employees")
-    print("DATABASE NOW:", cursor.fetchall())
+    sheet = client.open("EmployeeDB").sheet1
 
-    conn.close()
-
-def update_employee(name, email):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE employees
-        SET email=?
-        WHERE LOWER(employee_name)=LOWER(?)
-    """, (email, name))
-
-    conn.commit()
-    conn.close()
-
-def delete_employee(name):
-
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        DELETE FROM employees
-        WHERE LOWER(employee_name)=LOWER(?)
-    """, (name,))
-
-    conn.commit()
-    conn.close()
+    return sheet
 
 
 # ---------------------------
@@ -401,20 +339,16 @@ def upload():
 @app.route("/debug-db")
 def debug_db():
 
-    conn = get_db()
-    cursor = conn.cursor()
+    sheet = get_employee_sheet()
 
-    cursor.execute("SELECT * FROM employees")
-
-    rows = cursor.fetchall()
-
-    conn.close()
+    rows = sheet.get_all_records()
 
     return jsonify({
-        "database": DB_PATH,
         "employees": rows,
         "count": len(rows)
     })
+
+
 @app.route("/create-task", methods=["POST"])
 def create_task():
     try:
@@ -1188,32 +1122,40 @@ def normalize_name(name):
 
 def get_employee_email(name):
 
-    print("===== LOOKING UP EMAIL =====")
-    print("SEARCH NAME:", name)
+    print("===== GOOGLE SHEET LOOKUP =====")
+    print("SEARCH:", name)
 
-    conn = get_db()
-    cursor = conn.cursor()
+    sheet = get_employee_sheet()
 
-    cursor.execute("""
-        SELECT email
-        FROM employees
-        WHERE LOWER(employee_name)=LOWER(?)
-    """, (name.strip(),))
+    rows = sheet.get_all_records()
 
-    result = cursor.fetchone()
+    for row in rows:
 
-    conn.close()
+        sheet_name = str(row["employee_name"]).strip()
 
-    print("RESULT:", result)
+        if sheet_name.lower() == name.strip().lower():
 
-    if result:
-        return result[0]
+            print("FOUND:", row["email"])
+
+            return row["email"]
+
+    print("NOT FOUND")
 
     return None
 
+def add_employee_sheet(name,email):
+
+    sheet = get_employee_sheet()
+
+    sheet.append_row([
+        name,
+        email
+    ])
+
+    print("Added to Google Sheet:", name)
 
 def create_employee(employee, email, drive_file_id):
-    add_employee_db(employee, email)
+    add_employee_sheet(employee,email)
 
     local_file = download_file(drive_file_id)
 
@@ -1579,10 +1521,8 @@ def add_employee():
     print("BEFORE SQLITE INSERT")
     print("Employee:", employee)
     print("Email:", email)
+    add_employee_sheet(employee,email)
 
-    add_employee_db(employee, email)
-
-    print("AFTER SQLITE INSERT")
 
     # Insert new employee column BEFORE Open
     try:
