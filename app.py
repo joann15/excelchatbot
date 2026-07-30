@@ -55,18 +55,27 @@ def init_employee_db():
 init_employee_db()
 
 def add_employee_db(name, email):
+
+    print("===== ADDING TO SQLITE =====")
+    print(name, email)
+
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
-    cursor.execute(
-        """
+    print("DB PATH:", os.path.abspath("employees.db"))
+
+    cursor.execute("""
         INSERT OR REPLACE INTO employees(employee_name,email)
         VALUES(?,?)
-        """,
-        (name, email)
-    )
+    """, (name, email))
 
     conn.commit()
+
+    cursor.execute("SELECT * FROM employees")
+    rows = cursor.fetchall()
+
+    print("ROWS AFTER INSERT:", rows)
+
     conn.close()
 
 def update_employee(name, email):
@@ -362,20 +371,31 @@ def upload():
         return jsonify({
             "error": str(e)
         }), 500
-
+    
 @app.route("/debug-db")
 def debug_db():
+
+    import os
+
+    db_path = os.path.abspath("employees.db")
 
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
-    cursor.execute("SELECT employee_name, email FROM employees")
+    cursor.execute("SELECT COUNT(*) FROM employees")
+    count = cursor.fetchone()[0]
 
+    cursor.execute("SELECT employee_name, email FROM employees")
     rows = cursor.fetchall()
 
     conn.close()
 
-    return jsonify(rows)
+    return jsonify({
+        "db_path": db_path,
+        "db_exists": os.path.exists(db_path),
+        "count": count,
+        "employees": rows
+    })
 
 @app.route("/create-task", methods=["POST"])
 def create_task():
