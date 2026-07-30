@@ -77,7 +77,7 @@ def add_employee_db(name, email):
     print("DATABASE NOW:", cursor.fetchall())
 
     conn.close()
-    
+
 def update_employee(name, email):
 
     conn = sqlite3.connect("employees.db")
@@ -1422,6 +1422,7 @@ def update_task():
         "employees": employees,
         "emails": emails
     })
+
 @app.route("/add-employee", methods=["POST"])
 def add_employee():
 
@@ -1460,7 +1461,33 @@ def add_employee():
     print("AFTER SQLITE INSERT")
 
     # Insert new employee column BEFORE Open
-    ws.insert_cols(open_col)
+    try:
+        ws.insert_cols(open_col)
+        ws.cell(row=1, column=open_col).value = employee
+
+        for r in range(2, ws.max_row + 1):
+            ws.cell(r, open_col).value = None
+
+        wb.save(local_file)
+
+        update_file(drive_file_id, local_file)
+        new_tasks = extract_tasks(local_file)
+
+        if DB:
+            DB[0]["tasks"] = new_tasks
+
+    except Exception as e:
+        print("ADD EMPLOYEE FAILED:")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
+
+    return jsonify({
+        "success": True,
+        "message": f"{employee} added successfully."\
+    })
 
 
 @app.route("/download")
