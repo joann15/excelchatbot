@@ -203,6 +203,15 @@ def send_to_n8n(
 ):
     
     emails = []
+    print("N8N EMAIL LOOKUP")
+    print("EMPLOYEES:", employees)
+
+    for employee in employees:
+        print(
+            employee,
+            "=>",
+            get_employee_email(employee)
+        )
 
     for employee in employees:
         email = get_employee_email(employee)
@@ -875,9 +884,9 @@ Otherwise return:
                     "answer": "Please upload a Job Card first."
                 })
 
-            excel_path = DB[0]["path"]
+        excel_path = DB[0]["path"]
 
-              # ====================================================
+        # ====================================================
         # CREATE TASK
         # ====================================================
 
@@ -1016,24 +1025,19 @@ Otherwise return:
         # ADD EMPLOYEE
         # ====================================================
         elif action == "add_employee":
-
             employee = command_json.get("employee", "")
             email = command_json.get("email", "")
 
-            add_employee_db(employee, email)
+            try:
+                create_employee(
+                employee,
+                email,
+                LAST_DRIVE_FILE_ID
+                )
 
-            response = requests.post(
-                "https://excelchatbot.onrender.com/add-employee",
-                json={
-                    "employee": employee,
-                    "email": email,
-                    "drive_file_id": LAST_DRIVE_FILE_ID
-                },
-                timeout=30
-            )
+                print("EMPLOYEE CREATED:", employee)
 
-            if response.status_code == 200:
-                send_to_n8n(
+                success = send_to_n8n(
                     action="welcome_employee",
                     task="",
                     employees=[employee],
@@ -1042,14 +1046,20 @@ Otherwise return:
                     drive_file_id=LAST_DRIVE_FILE_ID
                 )
 
+                print("WELCOME EMAIL N8N RESULT:", success)
+
                 return jsonify({
                     "answer": f"{employee} added successfully."
                 })
 
-            return jsonify({
-                "answer": "Failed to add employee."
-            })
+            except Exception as e:
+                print("ADD EMPLOYEE FAILED:")
+                traceback.print_exc()
 
+                return jsonify({
+                    "answer": "Failed to add employee.",
+                    "error": str(e)
+                }),500
         # ====================================================
         # NORMAL CHAT
         # ====================================================
@@ -1138,6 +1148,34 @@ def get_employee_email(employee):
     conn.close()
 
     return row[0] if row else ""
+
+def create_employee(employee, email, drive_file_id):
+    add_employee_db(employee, email)
+
+    local_file = download_file(drive_file_id)
+
+    wb = load_workbook(local_file)
+    ws = wb.active
+
+    headers = [cell.value for cell in ws[1]]
+
+    open_col = headers.index("Open") + 1
+
+    ws.insert_cols(open_col)
+    ws.cell(row=1, column=open_col).value = employee
+
+    wb.save(local_file)
+
+    update_file(drive_file_id, local_file)
+
+    new_tasks = extract_tasks(local_file)
+
+    if DB:
+        DB[0]["tasks"] = new_tasks
+
+    os.remove(local_file)
+
+    return True
 
 @app.route("/delete-task", methods=["POST"])
 def delete_task():
