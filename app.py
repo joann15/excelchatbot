@@ -667,65 +667,106 @@ def update_excel():
 # ---------------------------
 # 6. Dashboard API
 # ---------------------------
+# ---------------------------
+# 6. Dashboard API
+# ---------------------------
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
+
+    global DB
 
     employee_counts = {}
     employee_status = {}
     unique_tasks = set()
     status_counts = {}
     status_colors = {}
-    
-    if DB:
-        wb = load_workbook(DB[0]["path"])
-        ws = wb.active
 
-        headers = [cell.value for cell in ws[1]]
+    try:
 
-        open_col = headers.index("Open")
-        
-        for employee in headers[2:open_col]:
-            if employee:
-                employee_counts.setdefault(employee, 0)
-                employee_status.setdefault(employee, {})
+        # ALWAYS reload latest Excel
+        if LAST_DRIVE_FILE_ID:
 
-    print("===== DASHBOARD =====")
-            
-    for doc in DB:
-        print("Dashboard:", doc["file"], len(doc["tasks"]))
+            local_file = download_file(LAST_DRIVE_FILE_ID)
 
-    for doc in DB:
-        for t in doc["tasks"]:
+            tasks = extract_tasks(local_file)
 
-            # Unique tasks
-            unique_tasks.add(t["task"])
+            # rebuild cache
+            DB = [{
+                "file": "jobcard.xlsx",
+                "path": local_file,
+                "tasks": tasks
+            }]
 
-            emp = t["employee"]
-            status = t["status"]
-            status_colors[status] = t["color"]
+            print("Dashboard refreshed from Excel:", len(tasks))
 
-            # Total tasks per employee
-            employee_counts[emp] = employee_counts.get(emp, 0) + 1
 
-            # Overall status counts
-            status_counts[status] = status_counts.get(status, 0) + 1
+        # Now calculate dashboard
+        if DB:
 
-            # Status counts per employee
-            if emp not in employee_status:
-                employee_status[emp] = {}
+            wb = load_workbook(DB[0]["path"])
+            ws = wb.active
 
-            employee_status[emp][status] = (
-                employee_status[emp].get(status, 0) + 1
+            headers = [cell.value for cell in ws[1]]
+
+            open_col = headers.index("Open")
+
+            for employee in headers[2:open_col]:
+
+                if employee:
+                    employee_counts.setdefault(employee, 0)
+                    employee_status.setdefault(employee, {})
+
+
+        for doc in DB:
+
+            print(
+                "Dashboard:",
+                doc["file"],
+                len(doc["tasks"])
             )
 
-    return jsonify({
-    "total_tasks": len(unique_tasks),
-    "total_employees": len(employee_counts),
-    "tasks_per_employee": employee_counts,
-    "status_breakdown": status_counts,
-    "status_colors": status_colors,
-    "employee_status": employee_status
-})
+            for t in doc["tasks"]:
+
+                unique_tasks.add(t["task"])
+
+                emp = t["employee"]
+                status = t["status"]
+
+                status_colors[status] = t["color"]
+
+                employee_counts[emp] = (
+                    employee_counts.get(emp, 0) + 1
+                )
+
+                status_counts[status] = (
+                    status_counts.get(status, 0) + 1
+                )
+
+                if emp not in employee_status:
+                    employee_status[emp] = {}
+
+                employee_status[emp][status] = (
+                    employee_status[emp].get(status, 0) + 1
+                )
+
+
+        return jsonify({
+            "total_tasks": len(unique_tasks),
+            "total_employees": len(employee_counts),
+            "tasks_per_employee": employee_counts,
+            "status_breakdown": status_counts,
+            "status_colors": status_colors,
+            "employee_status": employee_status
+        })
+
+
+    except Exception as e:
+
+        print("DASHBOARD ERROR:", e)
+
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 @app.route("/test-post", methods=["POST"])
 def test_post():
@@ -1167,6 +1208,14 @@ def create_employee(employee, email, drive_file_id):
     wb.save(local_file)
 
     update_file(drive_file_id, local_file)
+    global DB
+    new_tasks = extract_tasks(local_file)
+
+    DB = [{
+        "file": "jobcard.xlsx",
+        "path": local_file,
+        "tasks": new_tasks
+    }]
 
     new_tasks = extract_tasks(local_file)
 
@@ -1213,6 +1262,13 @@ def delete_task():
 
     wb.save(local_file)
     update_file(drive_file_id, local_file)
+    global DB
+    new_tasks = extract_tasks(local_file)
+    DB = [{
+        "file": "jobcard.xlsx",
+        "path": local_file,
+        "tasks": new_tasks
+    }]
 
     new_tasks = extract_tasks(local_file)
 
@@ -1436,6 +1492,14 @@ def update_task():
 
     wb.save(local_file)
     update_file(drive_file_id, local_file)
+    global DB
+    new_tasks = extract_tasks(local_file)
+    DB = [{
+        "file": "jobcard.xlsx",
+        "path": local_file,
+        "tasks": new_tasks
+    }]
+    
     print("Workbook saved.")
 
     # Refresh dashboard data
@@ -1509,6 +1573,14 @@ def add_employee():
         wb.save(local_file)
 
         update_file(drive_file_id, local_file)
+        global DB
+        new_tasks = extract_tasks(local_file)
+        DB = [{
+            "file": "jobcard.xlsx",
+            "path": local_file,
+            "tasks": new_tasks
+        }]
+        
         new_tasks = extract_tasks(local_file)
 
         if DB:
