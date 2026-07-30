@@ -363,6 +363,20 @@ def upload():
             "error": str(e)
         }), 500
 
+@app.route("/debug-db")
+def debug_db():
+
+    conn = sqlite3.connect("employees.db")
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT employee_name, email FROM employees")
+
+    rows = cursor.fetchall()
+
+    conn.close()
+
+    return jsonify(rows)
+
 @app.route("/create-task", methods=["POST"])
 def create_task():
     try:
@@ -403,12 +417,11 @@ def create_task():
 
         # Find employee columns
         employee_cols = []
-
         for employee in employees:
             found = False
 
             for i, header in enumerate(headers):
-                if header and employee.lower() in str(header).lower():
+                if header and str(header).strip().lower() == employee.strip().lower():
                     employee_cols.append(i + 1)
                     found = True
                     break
@@ -1085,15 +1098,10 @@ QUESTION
         "error": str(e)
     }),500
 
-
 def get_employee_email(employee):
-
     if not employee:
         return ""
 
-    first_name = employee.split()[0]
-    
-    print("Using database:", os.path.abspath("employees.db"))
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
@@ -1103,19 +1111,13 @@ def get_employee_email(employee):
         FROM employees
         WHERE LOWER(employee_name)=LOWER(?)
         """,
-        (first_name,)
+        (employee.strip(),)
     )
 
     row = cursor.fetchone()
-
-    print("DB SEARCH:", first_name, "RESULT:", row)
-
     conn.close()
 
-    if row:
-        return row[0]
-
-    return ""
+    return row[0] if row else ""
 
 @app.route("/delete-task", methods=["POST"])
 def delete_task():
