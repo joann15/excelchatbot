@@ -537,16 +537,14 @@ def create_task():
 
         print("CREATE SUCCESS")
 
-
         return jsonify({
-            "success": True,
+            "message": "CREATE SUCCESS",
             "task": task,
             "employees": employees,
             "emails": emails,
             "open": open_date,
             "close": close_date
-        })
-
+            })
     except Exception as e:
         print("CREATE ERROR:", e)
 
