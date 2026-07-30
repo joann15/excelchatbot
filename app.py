@@ -1640,6 +1640,13 @@ def download():
         download_name="Updated_JobCard.xlsx"
     )
 
+@app.route("/test-email/<name>")
+def test_email(name):
+
+    return jsonify({
+        "name": name,
+        "email": get_employee_email(name)
+    })
 
 # ---------------------------
 # RUN
