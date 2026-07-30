@@ -1185,27 +1185,32 @@ def normalize_name(name):
         .replace(".", "")
         .replace("  ", " ")
     )
-def get_employee_email(employee):
-    if not employee:
-        return ""
 
-    conn = sqlite3.connect("employees.db")
+def get_employee_email(name):
+
+    print("===== LOOKING UP EMAIL =====")
+    print("SEARCH NAME:", name)
+
+    conn = get_db()
     cursor = conn.cursor()
 
-    cursor.execute(
-        """
+    cursor.execute("""
         SELECT email
         FROM employees
         WHERE LOWER(employee_name)=LOWER(?)
-        LIMIT 1
-        """,
-        (employee.strip(),)
-    )
+    """, (name.strip(),))
 
-    row = cursor.fetchone()
+    result = cursor.fetchone()
+
     conn.close()
 
-    return row[0] if row else ""
+    print("RESULT:", result)
+
+    if result:
+        return result[0]
+
+    return None
+
 
 def create_employee(employee, email, drive_file_id):
     add_employee_db(employee, email)
