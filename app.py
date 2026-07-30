@@ -56,28 +56,28 @@ init_employee_db()
 
 def add_employee_db(name, email):
 
-    print("===== ADDING TO SQLITE =====")
-    print(name, email)
+    print("===== INSIDE ADD EMPLOYEE DB =====")
+    print("NAME:", name)
+    print("EMAIL:", email)
 
     conn = sqlite3.connect("employees.db")
     cursor = conn.cursor()
 
-    print("DB PATH:", os.path.abspath("employees.db"))
-
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT OR REPLACE INTO employees(employee_name,email)
         VALUES(?,?)
-    """, (name, email))
+        """,
+        (name, email)
+    )
 
     conn.commit()
 
     cursor.execute("SELECT * FROM employees")
-    rows = cursor.fetchall()
-
-    print("ROWS AFTER INSERT:", rows)
+    print("DATABASE NOW:", cursor.fetchall())
 
     conn.close()
-
+    
 def update_employee(name, email):
 
     conn = sqlite3.connect("employees.db")
@@ -1441,10 +1441,8 @@ def add_employee():
 
     headers = [cell.value for cell in ws[1]]
 
-    # Find the Open column
     open_col = headers.index("Open") + 1
 
-    # Prevent duplicate employee
     if employee in headers:
         os.remove(local_file)
         return jsonify({
@@ -1453,37 +1451,18 @@ def add_employee():
         })
 
     # Save email in database
+    print("BEFORE SQLITE INSERT")
+    print("Employee:", employee)
+    print("Email:", email)
+
     add_employee_db(employee, email)
+
+    print("AFTER SQLITE INSERT")
 
     # Insert new employee column BEFORE Open
     ws.insert_cols(open_col)
 
-    # Write employee name in header
-    ws.cell(row=1, column=open_col).value = employee
 
-    # Keep remaining cells blank
-    for r in range(2, ws.max_row + 1):
-        ws.cell(r, open_col).value = None
-
-    wb.save(local_file)
-    update_file(drive_file_id, local_file)
-
-    # Refresh dashboard
-    new_tasks = extract_tasks(local_file)
-
-    if DB:
-        DB[0]["tasks"] = new_tasks
-
-    try:
-        os.remove(local_file)
-    except Exception as e:
-        print("Couldn't delete temporary file:", e)
-
-    return jsonify({
-        "success": True,
-        "message": f"{employee} added successfully."
-    })
- 
 @app.route("/download")
 def download():
 
