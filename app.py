@@ -294,14 +294,15 @@ def find_task_details(excel_path, task_name):
     print("Employees found:", employees)
 
     emails = []
-
     for emp in employees:
         email = get_employee_email(emp)
 
-        print(emp, "->", email)
-
         if email:
             emails.append(email)
+            print(emp, "=>", email)
+
+        else:
+            print("EMAIL NOT FOUND:", emp)
 
     return {
         "task": task_name,
@@ -667,9 +668,7 @@ def update_excel():
 # ---------------------------
 # 6. Dashboard API
 # ---------------------------
-# ---------------------------
-# 6. Dashboard API
-# ---------------------------
+
 @app.route("/dashboard", methods=["GET"])
 def dashboard():
 
@@ -1169,6 +1168,17 @@ QUESTION
         "error": str(e)
     }),500
 
+def normalize_name(name):
+    if not name:
+        return ""
+
+    return (
+        name
+        .strip()
+        .lower()
+        .replace(".", "")
+        .replace("  ", " ")
+    )
 def get_employee_email(employee):
     if not employee:
         return ""
@@ -1181,6 +1191,7 @@ def get_employee_email(employee):
         SELECT email
         FROM employees
         WHERE LOWER(employee_name)=LOWER(?)
+        LIMIT 1
         """,
         (employee.strip(),)
     )

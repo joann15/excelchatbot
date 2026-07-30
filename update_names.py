@@ -4,19 +4,21 @@ conn = sqlite3.connect("employees.db")
 cursor = conn.cursor()
 
 updates = [
-    ("Soumyadeep P", "Soumyadeep"),
-    ("Shrawani M", "Shrawani"),
-    ("Sneha B", "Sneha"),
-    ("Rahi M", "Rahi"),
-    ("Vanshika G", "Vanshika")
+    ("Ankit O", "Ankit"),
+    ("Pranav Y", "Pranav"),
+    ("Akash P", "Akash"),
+    ("Gaurav M", "Gaurav"),
+    ("Aditya S", "Aditya"),
+    ("Tanvi B", "Tanvi"),
+    ("Chandrashekhar L", "Chandrashekhar"),
 ]
 
 for new_name, old_name in updates:
     cursor.execute(
         """
         UPDATE employees
-        SET employee_name = ?
-        WHERE employee_name = ?
+        SET employee_name=?
+        WHERE employee_name=?
         """,
         (new_name, old_name)
     )
@@ -24,8 +26,8 @@ for new_name, old_name in updates:
 conn.commit()
 
 cursor.execute("SELECT * FROM employees")
-
-for row in cursor.fetchall():
-    print(row)
+print(cursor.fetchall())
 
 conn.close()
+
+print("Done")
