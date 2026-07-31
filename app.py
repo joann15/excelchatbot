@@ -1558,7 +1558,7 @@ def add_employee():
 
     return jsonify({
         "success": True,
-        "message": f"{employee} added successfully."\
+        "message": f"{employee} added successfully."
     })
 
 
