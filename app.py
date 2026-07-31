@@ -157,7 +157,8 @@ def send_to_n8n(
 ):
     
     emails = []
-    print("N8N EMAIL LOOKUP")
+    print("========== ENTERED send_to_n8n ==========")
+    print("ACTION:", action)
     print("EMPLOYEES:", employees)
 
     for employee in employees:
@@ -188,17 +189,26 @@ def send_to_n8n(
 
     print("===== N8N PAYLOAD =====")
     print(payload)
+    print("Webhook:", N8N_WEBHOOK)
 
-    print("Calling n8n...")
+    try:
+        res = requests.post(
+            N8N_WEBHOOK,
+            json=payload,
+            timeout=120
+        )
 
-    res = requests.post(
-        N8N_WEBHOOK,
-        json=payload,
-        timeout=120
-    )
+        print("POST SENT")
+        print("Status:", res.status_code)
+        print("Body:", res.text)
 
-    print("Returned from n8n:", res.status_code)
-    return res.status_code == 200
+        return res.status_code == 200
+
+    except Exception:
+        print("REQUEST FAILED")
+        traceback.print_exc()
+        raise
+
 
 def find_task_details(excel_path, task_name):
 
