@@ -730,6 +730,7 @@ def test_post():
 from collections import defaultdict
 @app.route("/chat", methods=["POST"])
 def chat():
+    print("ENTERED CHAT ROUTE")
     print("PID:", os.getpid())
     print("DB SIZE:", len(DB))
     print("DRIVE:", LAST_DRIVE_FILE_ID)
