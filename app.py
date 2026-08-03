@@ -1,5 +1,6 @@
 import os
 import json
+from urllib import response
 from flask import Flask, request, jsonify, send_file
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -800,19 +801,24 @@ Otherwise return:
             )
 
             print("AFTER send_to_n8n")
-            print(success)
-
-            return jsonify({
+            print("SUCCESS =", success)
+            response = {
                 "answer": str(success)
-            })
+            }
+
+            print("RETURNING:", response)
+            return jsonify(response)
 
         return jsonify({
             "answer": "Normal chat"
         })
 
     except Exception as e:
+        print("========== CHAT ERROR ==========")
         traceback.print_exc()
+
         return jsonify({
+            "answer": "Backend crashed",
             "error": str(e)
         }), 500
 
