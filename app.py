@@ -39,8 +39,6 @@ DB = []
 LAST_UPLOADED_FILE = None
 LAST_DRIVE_FILE_ID = None
 
-
-
 def get_employee_sheet():
 
     scopes = [
@@ -49,16 +47,22 @@ def get_employee_sheet():
     ]
 
     creds = Credentials.from_service_account_file(
-        "/etc/secrets/service-account.json",
+        "service-account.json",
         scopes=scopes
     )
 
+    print("===== SERVICE ACCOUNT USED =====")
+    print(creds.service_account_email)
+
     client = gspread.authorize(creds)
 
-    sheet = client.open("EmployeeDB").sheet1
+    spreadsheet = client.open_by_key(
+        "1LX121_6X4ptcBb0DycWWn5yqCJd3AppMbTxGk78MqPc"
+    )
+
+    sheet = spreadsheet.worksheet("Sheet1")
 
     return sheet
-
 
 # ---------------------------
 # 4. Extract tasks
@@ -162,17 +166,13 @@ def send_to_n8n(
     print("EMPLOYEES:", employees)
 
     for employee in employees:
-        print(
-            employee,
-            "=>",
-            get_employee_email(employee)
-        )
-
-    for employee in employees:
         email = get_employee_email(employee)
+        print(employee, "=>", email)
 
         if email:
             emails.append(email)
+
+     
 
     payload = {
         "action": action,
@@ -373,19 +373,21 @@ def create_task():
         close_date = data["close"]
         drive_file_id = data["drive_file_id"]
 
-        emails = []
-        missing_emails = []
+        emails = data.get("emails", [])
+        print("EMAILS RECEIVED FROM N8N:", emails)
 
-        for employee in employees:
-            email = get_employee_email(employee)
-            if email:
-                emails.append(email)
-            else:
-                missing_emails.append(employee)
-                emails.append(None)  # keep index alignment with employees[]
+        if not emails:
+            print("No emails received, looking up...")
+            
+            emails = []
 
-        if missing_emails:
-            print("WARNING: No email found for:", missing_emails)
+            for employee in employees:
+                email = get_employee_email(employee)
+
+                if email:
+                    emails.append(email)
+                else:
+                    print("Missing email for:", employee)
 
         # Download Excel from Drive
         local_file = download_file(drive_file_id)
@@ -489,14 +491,15 @@ def create_task():
 
         print("CREATE SUCCESS")
 
+        print("FINAL EMAILS BEFORE RETURN:", data.get("emails"))
         return jsonify({
             "message": "CREATE SUCCESS",
             "task": task,
             "employees": employees,
-            "emails": emails,
+            "emails": data.get("emails", emails),
             "open": open_date,
             "close": close_date
-            })
+        })
     except Exception as e:
         print("CREATE ERROR:", e)
 
@@ -733,14 +736,13 @@ def chat():
     print("DB SIZE:", len(DB))
     print("DRIVE:", LAST_DRIVE_FILE_ID)
 
-   
-    
     try:
+        print("Step 1")
         # -------------------------
         # STEP 1 - Get employee message
         # -------------------------
         query = request.json.get("message", "")
-        print("User message:", query)
+        print("STEP 2", query)
 
         # -------------------------
         # STEP 2 - Let GPT determine
@@ -855,14 +857,17 @@ Otherwise return:
                 }
             ]
         )
+        print("STEP 3")
 
         command_json = json.loads(
             command.choices[0].message.content
         )
+        print("STEP 4", command_json)
 
-        print("COMMAND:", command_json)
+
 
         action = command_json.get("action", "chat")
+        print("STEP 5", action)
 
         # -------------------------
         # Make sure a Job Card exists
@@ -881,6 +886,7 @@ Otherwise return:
         # ====================================================
 
         if action == "create":
+            print("STEP 6 - CREATE")
 
             task = command_json.get("task", "")
             employees = command_json.get("employees", [])
@@ -894,6 +900,8 @@ Otherwise return:
                 LAST_DRIVE_FILE_ID
             )
 
+            print("RETURNED FROM N8N")
+            print("SUCCESS:", success)
             print("N8N SUCCESS VALUE:", success)
             if success:
                 if isinstance(employees, list):
@@ -1129,30 +1137,37 @@ def normalize_name(name):
         .replace(".", "")
         .replace("  ", " ")
     )
-
-def get_employee_email(name):
+def get_employee_email(employee):
 
     print("===== GOOGLE SHEET LOOKUP =====")
-    print("SEARCH:", name)
+    print("SEARCH:", employee)
 
     sheet = get_employee_sheet()
 
     rows = sheet.get_all_records()
 
+    if not rows:
+        print("NO ROWS FOUND")
+        return None
+
+    print("COLUMN CHECK:")
+    print(rows[0].keys())
+
     for row in rows:
+        print("FULL ROW:", row)
 
         sheet_name = str(row["employee_name"]).strip()
+        print("CHECKING:", sheet_name)
 
-        if sheet_name.lower() == name.strip().lower():
+        if not sheet_name:
+            continue
 
-            print("FOUND:", row["email"])
-
+        if employee.strip().lower().startswith(sheet_name.lower()):
+            print("MATCH FOUND:")
+            print(employee, "=>", row["email"])
             return row["email"]
-
-    print("NOT FOUND")
-
-    return None
-
+           
+            
 def add_employee_sheet(name,email):
 
     sheet = get_employee_sheet()
