@@ -168,9 +168,7 @@ def send_to_n8n(
     for employee in employees:
         email = get_employee_email(employee)
         print(employee, "=>", email)
-
-        if email:
-            emails.append(email)
+        emails.append(email if email else "")
 
      
 
@@ -924,11 +922,10 @@ Otherwise return:
                 print(response)
                 return jsonify(response)
 
+            print("CREATE FAILED RETURNING TO FRONTEND")
             return jsonify({
-                "answer": "Failed to create task."
-            })
-
-
+                "answer": "Failed to create task. Please check employee name."
+            }), 200
         # ====================================================
         # DELETE TASK
         # ====================================================
@@ -1003,6 +1000,7 @@ Otherwise return:
                 else:
                     success = False
 
+            print("CREATE SUCCESS VALUE:", success)
             if success:
                 send_to_n8n(
                     action="update",
