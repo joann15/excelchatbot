@@ -717,29 +717,20 @@ def dashboard():
         return jsonify({
             "error": str(e)
         }), 500
-
-@app.route("/test-post", methods=["POST"])
-def test_post():
-    print("TEST POST HIT")
-    return jsonify({
-        "message": "POST works"
-    })
-# ---------------------------
-# 7. Chat API
-# ---------------------------
-from collections import defaultdict
 @app.route("/chat", methods=["POST"])
 def chat():
 
-    query = request.json.get("message", "")
+    try:
 
-    command = client.chat.completions.create(
-        model="gpt-4.1",
-        response_format={"type": "json_object"},
-        messages=[
-            {
-                "role": "system",
-                "content": """
+        query = request.json.get("message", "")
+
+        command = client.chat.completions.create(
+            model="gpt-4.1",
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
 You are a command detector.
 
 Always respond with JSON.
@@ -756,18 +747,29 @@ Otherwise return:
   "action":"chat"
 }
 """
-            },
-            {
-                "role": "user",
-                "content": query
-            }
-        ]
-    )
+                },
+                {
+                    "role": "user",
+                    "content": query
+                }
+            ]
+        )
 
-    command_json = json.loads(
-    command.choices[0].message.content
-    )
-    return jsonify(command_json)
+        command_json = json.loads(
+            command.choices[0].message.content
+        )
+
+        action = command_json.get("action", "chat")
+
+        return jsonify({
+            "answer": f"Action detected: {action}"
+        })
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 def normalize_name(name):
     if not name:
