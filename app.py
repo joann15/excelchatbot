@@ -729,12 +729,14 @@ def test_post():
 # ---------------------------
 from collections import defaultdict
 @app.route("/chat", methods=["POST"])
+@app.route("/chat", methods=["POST"])
 def chat():
-    print("========== CHAT ROUTE HIT ==========")
-    print("Request JSON:", request.json)
+    print("CHAT HIT")
+
+    query = request.json.get("message","")
 
     return jsonify({
-        "answer": "Hello from Render!"
+        "answer": query
     })
 
 def normalize_name(name):
