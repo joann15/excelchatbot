@@ -769,10 +769,17 @@ Otherwise return:
 
 
             excel_path = DB[0]["path"]
-            return jsonify({
-                "answer": "DB OK"
-            })
+            if action == "create":
+                task = command_json.get("task", "")
+                employees = command_json.get("employees", [])
 
+                return jsonify({
+                    "answer": f"Task={task}, Employees={employees}"
+                })
+
+            return jsonify({
+                "answer": "Not create"
+            })
     except Exception as e:
         traceback.print_exc()
         return jsonify({
