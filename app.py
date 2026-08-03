@@ -729,16 +729,44 @@ def test_post():
 # ---------------------------
 from collections import defaultdict
 @app.route("/chat", methods=["POST"])
-@app.route("/chat", methods=["POST"])
 def chat():
-    print("CHAT HIT")
 
-    query = request.json.get("message","")
+    query = request.json.get("message", "")
+
+    command = client.chat.completions.create(
+        model="gpt-4.1",
+        response_format={"type": "json_object"},
+        messages=[
+            {
+                "role": "system",
+                "content": """
+You are a command detector.
+
+Always respond with JSON.
+
+If user wants to create a task return:
+
+{
+  "action":"create"
+}
+
+Otherwise return:
+
+{
+  "action":"chat"
+}
+"""
+            },
+            {
+                "role": "user",
+                "content": query
+            }
+        ]
+    )
 
     return jsonify({
-        "answer": query
+        "answer": command.choices[0].message.content
     })
-
 def normalize_name(name):
     if not name:
         return ""
