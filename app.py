@@ -920,6 +920,7 @@ Otherwise return:
                     }
                 print("FINAL JSON RESPONSE:")
                 print(response)
+                print("BEFORE CREATE RETURN")
                 return jsonify(response)
 
             print("CREATE FAILED RETURNING TO FRONTEND")
@@ -1125,7 +1126,7 @@ QUESTION
         return jsonify({
         "answer": "Backend crashed",
         "error": str(e)
-    }),500
+    }),200
 
 def normalize_name(name):
     if not name:
