@@ -717,10 +717,15 @@ def dashboard():
         return jsonify({
             "error": str(e)
         }), 500
+    
+from collections import defaultdict
+
 @app.route("/chat", methods=["POST"])
 def chat():
 
     try:
+
+        print("CHAT START")
 
         query = request.json.get("message", "")
 
@@ -730,22 +735,30 @@ def chat():
             messages=[
                 {
                     "role": "system",
-                    "content": """
+                    "content": f"""
 You are a command detector.
 
-Always respond with JSON.
+Always respond with valid JSON.
 
-If user wants to create a task return:
+DATE RULES:
+- Current year is {current_year}
+- Convert dates to YYYY-MM-DD
 
-{
-  "action":"create"
-}
+If the user wants to CREATE a task return:
+
+{{
+    "action":"create",
+    "task":"",
+    "employees":[],
+    "open":"",
+    "close":""
+}}
 
 Otherwise return:
 
-{
-  "action":"chat"
-}
+{{
+    "action":"chat"
+}}
 """
                 },
                 {
@@ -755,31 +768,48 @@ Otherwise return:
             ]
         )
 
-        command_json = json.loads(
-            command.choices[0].message.content
-        )
+        command_json = json.loads(command.choices[0].message.content)
+
+        print(command_json)
 
         action = command_json.get("action", "chat")
 
         if action != "chat":
+
             if len(DB) == 0:
                 return jsonify({
                     "answer": "Please upload a Job Card first."
                 })
 
+        if action == "create":
 
-            excel_path = DB[0]["path"]
-            if action == "create":
-                task = command_json.get("task", "")
-                employees = command_json.get("employees", [])
+            task = command_json.get("task", "")
+            employees = command_json.get("employees", [])
 
-                return jsonify({
-                    "answer": f"Task={task}, Employees={employees}"
-                })
+            print("TASK:", task)
+            print("EMPLOYEES:", employees)
+            print("BEFORE send_to_n8n")
+
+            success = send_to_n8n(
+                "create",
+                task,
+                employees,
+                command_json.get("open", ""),
+                command_json.get("close", ""),
+                LAST_DRIVE_FILE_ID
+            )
+
+            print("AFTER send_to_n8n")
+            print(success)
 
             return jsonify({
-                "answer": "Not create"
+                "answer": str(success)
             })
+
+        return jsonify({
+            "answer": "Normal chat"
+        })
+
     except Exception as e:
         traceback.print_exc()
         return jsonify({
