@@ -925,7 +925,7 @@ Otherwise return:
 
             return jsonify({
                 "answer": "Failed to create task. Please check employee name."
-            }), 200
+            })
 
         # ====================================================
         # DELETE TASK
@@ -1001,7 +1001,7 @@ Otherwise return:
                 else:
                     success = False
 
-            print("CREATE SUCCESS VALUE:", success)
+            print("UPDATE SUCCESS VALUE:", success)
             if success:
                 send_to_n8n(
                     action="update",
@@ -1126,7 +1126,7 @@ QUESTION
         return jsonify({
         "answer": "Backend crashed",
         "error": str(e)
-    }),200
+    }),500
 
 def normalize_name(name):
     if not name:
