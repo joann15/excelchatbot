@@ -764,9 +764,11 @@ Otherwise return:
         ]
     )
 
-    return jsonify({
-        "answer": command.choices[0].message.content
-    })
+    command_json = json.loads(
+    command.choices[0].message.content
+    )
+    return jsonify(command_json)
+
 def normalize_name(name):
     if not name:
         return ""
