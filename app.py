@@ -917,9 +917,12 @@ Otherwise return:
     "success": success
 })
 
-                return jsonify({
-        "answer": f"Task '{task}' assigned to {employee_text}."
-    })
+                response = {
+                    "answer": f"Task '{task}' assigned to {employee_text}."
+                    }
+                print("FINAL JSON RESPONSE:")
+                print(response)
+                return jsonify(response)
 
             return jsonify({
                 "answer": "Failed to create task."
