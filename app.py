@@ -761,9 +761,17 @@ Otherwise return:
 
         action = command_json.get("action", "chat")
 
-        return jsonify({
-            "answer": f"Action detected: {action}"
-        })
+        if action != "chat":
+            if len(DB) == 0:
+                return jsonify({
+                    "answer": "Please upload a Job Card first."
+                })
+
+
+            excel_path = DB[0]["path"]
+            return jsonify({
+                "answer": "DB OK"
+            })
 
     except Exception as e:
         traceback.print_exc()
