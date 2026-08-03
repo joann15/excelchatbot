@@ -898,41 +898,41 @@ Otherwise return:
                 LAST_DRIVE_FILE_ID
             )
 
+            print("========== AFTER N8N ==========")
             print("RETURNED FROM N8N")
             print("SUCCESS:", success)
-            print("N8N SUCCESS VALUE:", success)
+
             if success:
+
                 if isinstance(employees, list):
-                    employee_text = ", ".join(employees)
+                    employee_text = ", ".join(map(str, employees))
                 else:
                     employee_text = str(employees)
-                print("FINAL RESPONSE:", employee_text)
 
-                print("ABOUT TO RETURN CHAT RESPONSE")
-                print({
-    "task": task,
-    "employees": employees,
-    "success": success
-})
+                print("FINAL RESPONSE:", employee_text)
 
                 response = {
                     "answer": f"Task '{task}' assigned to {employee_text}."
-                    }
+                }
+
                 print("FINAL JSON RESPONSE:")
                 print(response)
+
                 print("BEFORE CREATE RETURN")
                 return jsonify(response)
 
             print("CREATE FAILED RETURNING TO FRONTEND")
+
             return jsonify({
                 "answer": "Failed to create task. Please check employee name."
             }), 200
+
         # ====================================================
         # DELETE TASK
         # ====================================================
 
-        elif action == "delete":
 
+        elif action == "delete":
             task = command_json.get("task", "")
 
             local_file = download_file(LAST_DRIVE_FILE_ID)
