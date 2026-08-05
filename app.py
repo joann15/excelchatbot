@@ -732,12 +732,8 @@ def dashboard():
 from collections import defaultdict
 @app.route("/chat", methods=["POST"])
 def chat():
-    print("ENTERED CHAT ROUTE")
-    print("PID:", os.getpid())
-    print("DB SIZE:", len(DB))
-    print("DRIVE:", LAST_DRIVE_FILE_ID)
-
     try:
+        print("ENTERED CHAT ROUTE")
         print("Step 1")
         # -------------------------
         # STEP 1 - Get employee message
@@ -1056,13 +1052,10 @@ Otherwise return:
                 })
 
             except Exception as e:
-                print("ADD EMPLOYEE FAILED:")
+                print("CHAT ERROR:", str(e))
+                import traceback
                 traceback.print_exc()
-
-                return jsonify({
-                    "answer": "Failed to add employee.",
-                    "error": str(e)
-                }),500
+                return jsonify({"error": str(e)}), 500
         # ====================================================
         # NORMAL CHAT
         # ====================================================
