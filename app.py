@@ -148,7 +148,6 @@ def extract_tasks(file):
 
 N8N_WEBHOOK = "https://excelchatbot-n8n-production.up.railway.app/webhook/task-manager"
 
-
 def send_to_n8n(
     action,
     task,
@@ -160,37 +159,39 @@ def send_to_n8n(
     value="",
     updates=None
 ):
-    
-    emails = []
-    print("========== ENTERED send_to_n8n ==========")
-    print("ACTION:", action)
-    print("EMPLOYEES:", employees)
-
-    for employee in employees:
-        email = get_employee_email(employee)
-        print(employee, "=>", email)
-        emails.append(email if email else "")
-
-     
-
-    payload = {
-        "action": action,
-        "task": task,
-        "employees": employees,
-        "emails": emails,
-        "open": open_date,
-        "close": close_date,
-        "field": field,
-        "value": value,
-        "updates": updates or [],
-        "drive_file_id": drive_file_id
-    }
-
-    print("===== N8N PAYLOAD =====")
-    print(payload)
-    print("Webhook:", N8N_WEBHOOK)
-
     try:
+        print("========== ENTERED send_to_n8n ==========")
+        print("ACTION:", action)
+        print("TASK:", task)
+        print("EMPLOYEES:", employees)
+        print("OPEN:", open_date)
+        print("CLOSE:", close_date)
+        print("DRIVE ID:", drive_file_id)
+
+        emails = []
+
+        for employee in employees:
+            email = get_employee_email(employee)
+            print(employee, "=>", email)
+            emails.append(email if email else "")
+
+        payload = {
+            "action": action,
+            "task": task,
+            "employees": employees,
+            "emails": emails,
+            "open": open_date,
+            "close": close_date,
+            "field": field,
+            "value": value,
+            "updates": updates or [],
+            "drive_file_id": drive_file_id
+        }
+
+        print("===== N8N PAYLOAD =====")
+        print(payload)
+        print("Webhook:", N8N_WEBHOOK)
+
         res = requests.post(
             N8N_WEBHOOK,
             json=payload,
@@ -203,12 +204,12 @@ def send_to_n8n(
 
         return res.status_code == 200
 
-    except Exception:
-        print("REQUEST FAILED")
+    except Exception as e:
+        print("========== N8N ERROR ==========")
+        print(type(e))
+        print(str(e))
         traceback.print_exc()
-        raise
-
-
+        return False
 def find_task_details(excel_path, task_name):
 
     wb = load_workbook(excel_path)
