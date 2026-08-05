@@ -289,6 +289,7 @@ def upload():
     print("PID:", os.getpid())
     print("DB SIZE:", len(DB))
     print("DRIVE:", LAST_DRIVE_FILE_ID)
+    
 
     try:
         DB.clear()
@@ -314,8 +315,10 @@ def upload():
 
             LAST_UPLOADED_FILE = filepath
             LAST_DRIVE_FILE_ID = drive_file_id
+            print("LAST_DRIVE_FILE_ID =", LAST_DRIVE_FILE_ID)
 
             tasks = extract_tasks(filepath)
+            print("Tasks extracted:", len(tasks))
 
             DB.append({
                 "file": file.filename,
@@ -469,6 +472,10 @@ def create_task():
 
 
         wb.save(local_file)
+        print("Workbook saved successfully.")
+        print("Starting upload to Cloud Storage...")
+        update_file(drive_file_id, local_file)
+        print("Cloud Storage upload finished.")
 
 
         # Upload updated Excel
@@ -500,11 +507,14 @@ def create_task():
             "close": close_date
         })
     except Exception as e:
-        print("CREATE ERROR:", e)
+        print("========== CREATE TASK ERROR ==========")
+    traceback.print_exc()
 
-        return jsonify({
-            "error": str(e)
-        }),500
+    return jsonify({
+        "error": str(e)
+    }), 500
+
+
     
 # update excel
 from openpyxl import load_workbook
@@ -720,16 +730,25 @@ def dashboard():
         }), 500
     
 from collections import defaultdict
-
 @app.route("/chat", methods=["POST"])
 def chat():
+    print("ENTERED CHAT ROUTE")
+    print("PID:", os.getpid())
+    print("DB SIZE:", len(DB))
+    print("DRIVE:", LAST_DRIVE_FILE_ID)
 
     try:
-
-        print("CHAT START")
-
+        print("Step 1")
+        # -------------------------
+        # STEP 1 - Get employee message
+        # -------------------------
         query = request.json.get("message", "")
+        print("STEP 2", query)
 
+        # -------------------------
+        # STEP 2 - Let GPT determine
+        # what action the employee wants
+        # -------------------------
         command = client.chat.completions.create(
             model="gpt-4.1",
             response_format={"type": "json_object"},
@@ -739,11 +758,17 @@ def chat():
                     "content": f"""
 You are a command detector.
 
-Always respond with valid JSON.
+Always respond with a valid JSON object.
+Do not return markdown.
+Do not return explanations.
+Your response must always be JSON.
 
 DATE RULES:
-- Current year is {current_year}
-- Convert dates to YYYY-MM-DD
+- The current calendar year is {current_year}.
+- If the user provides only a month and day without a year, always use {current_year}.
+- If the user explicitly provides a year, always use that year.
+- Never assume a previous year unless the user explicitly mentions it.
+- Convert dates to YYYY-MM-DD format.
 
 If the user wants to CREATE a task return:
 
@@ -754,6 +779,71 @@ If the user wants to CREATE a task return:
     "open":"",
     "close":""
 }}
+
+If the user wants to DELETE a task return:
+
+{{
+    "action":"delete",
+    "task":""
+}}
+
+If the user wants to update ONE field:
+
+{{
+  "action":"update",
+  "task":"LCM Testing",
+  "employee":"Sneha",
+  "updates":[
+    {{
+      "field":"status",
+      "value":"Done"
+    }}
+  ]
+}}
+
+If the user wants to ADD an employee return:
+
+{{
+  "action":"add_employee",
+  "employee":"",
+  "email":""
+}}
+
+If the user wants to update an employee email, return:
+
+{{
+    "action":"update_employee",
+    "name":"",
+    "email":""
+}}
+
+If the user wants to delete an employee, return:
+
+{{
+    "action":"delete_employee",
+    "name":""
+}}
+
+If the user wants to update MULTIPLE fields:
+{{
+  "action":"update",
+  "task":"LCM Testing",
+  "employee":"",
+  "updates":[
+    {{
+      "field":"status",
+      "value":"Done"
+    }},
+    {{
+      "field":"closeDate",
+      "value":"2026-08-30"
+    }}
+  ]
+}}
+
+For status updates:
+- Always include the employee whose status should change.
+- If no employee is mentioned, set employee to "".
 
 Otherwise return:
 
@@ -768,13 +858,21 @@ Otherwise return:
                 }
             ]
         )
+        print("STEP 3")
 
-        command_json = json.loads(command.choices[0].message.content)
+        command_json = json.loads(
+            command.choices[0].message.content
+        )
+        print("STEP 4", command_json)
 
-        print(command_json)
+
 
         action = command_json.get("action", "chat")
+        print("STEP 5", action)
 
+        # -------------------------
+        # Make sure a Job Card exists
+        # -------------------------
         if action != "chat":
 
             if len(DB) == 0:
@@ -782,14 +880,17 @@ Otherwise return:
                     "answer": "Please upload a Job Card first."
                 })
 
+        excel_path = DB[0]["path"]
+
+        # ====================================================
+        # CREATE TASK
+        # ====================================================
+
         if action == "create":
+            print("STEP 6 - CREATE")
 
             task = command_json.get("task", "")
             employees = command_json.get("employees", [])
-
-            print("TASK:", task)
-            print("EMPLOYEES:", employees)
-            print("BEFORE send_to_n8n")
 
             success = send_to_n8n(
                 "create",
@@ -800,27 +901,235 @@ Otherwise return:
                 LAST_DRIVE_FILE_ID
             )
 
-            print("AFTER send_to_n8n")
-            print("SUCCESS =", success)
-            response = {
-                "answer": str(success)
-            }
+            print("========== AFTER N8N ==========")
+            print("RETURNED FROM N8N")
+            print("SUCCESS:", success)
 
-            print("RETURNING:", response)
-            return jsonify(response)
+            if success:
+
+                if isinstance(employees, list):
+                    employee_text = ", ".join(map(str, employees))
+                else:
+                    employee_text = str(employees)
+
+                print("FINAL RESPONSE:", employee_text)
+
+                response = {
+                    "answer": f"Task '{task}' assigned to {employee_text}."
+                }
+
+                print("FINAL JSON RESPONSE:")
+                print(response)
+
+                print("BEFORE CREATE RETURN")
+                return jsonify(response)
+
+            print("CREATE FAILED RETURNING TO FRONTEND")
+
+            return jsonify({
+                "answer": "Failed to create task. Please check employee name."
+            })
+
+        # ====================================================
+        # DELETE TASK
+        # ====================================================
+
+
+        elif action == "delete":
+            task = command_json.get("task", "")
+
+            local_file = download_file(LAST_DRIVE_FILE_ID)
+
+            details = find_task_details(
+                local_file,
+                task
+            )
+
+            os.remove(local_file)
+
+            success = send_to_n8n(
+                "delete",
+                task,
+                details["employees"],
+                "",
+                "",
+                LAST_DRIVE_FILE_ID
+            )
+
+            if success:
+                return jsonify({
+                    "answer": f"Task '{task}' deleted."
+                })
+
+            return jsonify({
+                "answer": "Failed to delete task."
+            })
+        # ====================================================
+        # UPDATE TASK
+        # ====================================================
+        elif action == "update":
+            task = command_json.get("task", "")
+            updates = command_json.get("updates", [])
+
+            if command_json.get("employee"):
+                employees = [command_json["employee"]]
+            else:
+                local_file = download_file(LAST_DRIVE_FILE_ID)
+                details = find_task_details(local_file, task)
+                os.remove(local_file)
+                employees = details["employees"]
+
+            success = True
+            performed_updates = []
+
+            for update in updates:
+                response = requests.post(
+                    "https://excelchatbot.onrender.com/update-task",
+                    json={
+                        "task": task,
+                        "field": update["field"],
+                        "value": update["value"],
+                        "employees": employees,
+                        "selected_employee": command_json.get("employee", ""),
+                        "drive_file_id": LAST_DRIVE_FILE_ID
+                    },
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    performed_updates.append({
+                        "field": update["field"],
+                        "value": update["value"]
+                    })
+                else:
+                    success = False
+
+            print("UPDATE SUCCESS VALUE:", success)
+            if success:
+                send_to_n8n(
+                    action="update",
+                    task=task,
+                    employees=employees,
+                    open_date="",
+                    close_date="",
+                    drive_file_id=LAST_DRIVE_FILE_ID,
+                    updates=performed_updates
+                )
+
+                return jsonify({
+                    "answer": f"Task '{task}' updated successfully and employee notified."
+                })
+
+            return jsonify({
+                "answer": "Failed to update task."
+            })
+
+        # ====================================================
+        # ADD EMPLOYEE
+        # ====================================================
+        elif action == "add_employee":
+            employee = command_json.get("employee", "")
+            email = command_json.get("email", "")
+
+            try:
+                create_employee(
+                employee,
+                email,
+                LAST_DRIVE_FILE_ID
+                )
+
+                print("EMPLOYEE CREATED:", employee)
+
+                success = send_to_n8n(
+                    action="welcome_employee",
+                    task="",
+                    employees=[employee],
+                    open_date="",
+                    close_date="",
+                    drive_file_id=LAST_DRIVE_FILE_ID
+                )
+
+                print("WELCOME EMAIL N8N RESULT:", success)
+
+                return jsonify({
+                    "answer": f"{employee} added successfully."
+                })
+
+            except Exception as e:
+                print("ADD EMPLOYEE FAILED:")
+                traceback.print_exc()
+
+                return jsonify({
+                    "answer": "Failed to add employee.",
+                    "error": str(e)
+                }),500
+        # ====================================================
+        # NORMAL CHAT
+        # ====================================================
+
+        context = []
+        emp_tasks = defaultdict(dict)
+
+        for doc in DB:
+            for t in doc["tasks"]:
+
+                context.append(t)
+
+                emp = t["employee"]
+                task_name = t["task"]
+
+                emp_tasks[emp][task_name] = {
+                    "status": t["status"],
+                    "open": t["open"],
+                    "close": t["close"]
+                }
+
+        res = client.chat.completions.create(
+            model="gpt-4.1",
+            messages=[
+                {
+                    "role": "system",
+                    "content": """
+You are an AI Project Assistant.
+
+You answer ONLY from the provided job card data.
+
+RULES
+
+1. Be concise.
+2. Never invent information.
+3. Use bullet points when appropriate.
+4. If nothing matches say:
+"No matching tasks were found."
+"""
+                },
+                {
+                    "role": "user",
+                    "content": f"""
+JOB CARD DATA
+
+{json.dumps(context, indent=2)}
+
+QUESTION
+
+{query}
+"""
+                }
+            ]
+        )
 
         return jsonify({
-            "answer": "Normal chat"
+            "answer": res.choices[0].message.content
         })
-
     except Exception as e:
-        print("========== CHAT ERROR ==========")
+        print("========== REAL CHAT ERROR ==========")
+        print(type(e))
+        print(str(e))
         traceback.print_exc()
-
         return jsonify({
-            "answer": "Backend crashed",
-            "error": str(e)
-        }), 500
+        "answer": "Backend crashed",
+        "error": str(e)
+    }),500
 
 def normalize_name(name):
     if not name:
