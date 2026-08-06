@@ -878,15 +878,11 @@ Otherwise return:
         # ====================================================
 
         if action == "create":
-            print("STEP 6 - CREATE")
-
+            print("CREATE BLOCK ENTERED")
             task = command_json.get("task", "")
             employees = command_json.get("employees", [])
-
-            print("ABOUT TO CALL SEND_TO_N8N")
             print("TASK:", task)
             print("EMPLOYEES:", employees)
-            print("DRIVE:", LAST_DRIVE_FILE_ID)
 
             try:
                 success = send_to_n8n(
@@ -896,25 +892,27 @@ Otherwise return:
                     command_json.get("open", ""),
                     command_json.get("close", ""),
                     LAST_DRIVE_FILE_ID
-                )
-                print("SEND_TO_N8N RETURN VALUE:", success)
+                    )
+                print("N8N RESULT:", success)
 
             except Exception as e:
-                print("CREATE FLOW CRASHED:", e)
+                print("SEND_TO_N8N ERROR:", e)
                 traceback.print_exc()
 
                 return jsonify({
-                    "answer": "Task created but chatbot response failed",
-                    "error": str(e)
+                    "answer": "Task created but response failed"
                 }), 500
-        print("AFTER SEND_TO_N8N SUCCESS =", success)
-        print("SUCCESS TYPE =", type(success))
 
-        if success:
-            print("ENTERED SUCCESS BLOCK")
+
+            if success:
+                print("RETURNING SUCCESS RESPONSE")
+                return jsonify({
+                    "answer": f"Task '{task}' assigned successfully."
+                })
+            print("N8N FAILED")
             return jsonify({
-                "answer": "DEBUG: N8N SUCCESS"
-            })
+                "answer": "Task creation failed."
+            }), 500
 
         # ====================================================
         # DELETE TASK
