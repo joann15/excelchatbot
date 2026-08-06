@@ -148,7 +148,6 @@ def extract_tasks(file):
 
 N8N_WEBHOOK = "https://excelchatbot-n8n-production.up.railway.app/webhook/task-manager"
 
-
 def send_to_n8n(
     action,
     task,
@@ -160,22 +159,15 @@ def send_to_n8n(
     value="",
     updates=None
 ):
-    print("SEND_TO_N8N STARTED")
     try:
-        print("========== ENTERED send_to_n8n ==========")
-        print("ACTION:", action)
-        print("TASK:", task)
-        print("EMPLOYEES:", employees)
-        print("OPEN:", open_date)
-        print("CLOSE:", close_date)
-        print("DRIVE ID:", drive_file_id)
 
         emails = []
 
         for employee in employees:
             email = get_employee_email(employee)
-            print(employee, "=>", email)
-            emails.append(email if email else "")
+            
+            if email:
+                emails.append(email)
 
         payload = {
             "action": action,
@@ -190,37 +182,20 @@ def send_to_n8n(
             "drive_file_id": drive_file_id
         }
 
-        print("===== N8N PAYLOAD =====")
-        print(payload)
-        print("ABOUT TO CALL N8N WEBHOOK")
-
         res = requests.post(
             N8N_WEBHOOK,
             json=payload,
-            timeout=30
+            timeout=120
         )
 
-        print("N8N RESPONSE RECEIVED")
-        print("STATUS:", res.status_code)
-        print("BODY:", res.text)
+        print("N8N STATUS:", res.status_code)
 
-        print("ABOUT TO RETURN FROM send_to_n8n")
-        print("STATUS CODE:", res.status_code)
         return res.status_code == 200
 
-
-        # print("POST SENT")
-        # print("Status:", res.status_code)
-        # print("Body:", res.text)
-
-        # return res.status_code == 200
-
     except Exception as e:
-        print("========== N8N ERROR ==========")
-        print(type(e))
-        print(str(e))
-        traceback.print_exc()
+        print("send_to_n8n FAILED:", e)
         return False
+    
 def find_task_details(excel_path, task_name):
 
     wb = load_workbook(excel_path)
@@ -916,12 +891,8 @@ Otherwise return:
                 command_json.get("close", ""),
                 LAST_DRIVE_FILE_ID
             )
-            print("SEND_TO_N8N RETURN VALUE:", success)
-            print("TYPE:", type(success))
-
-            print("========== AFTER N8N ==========")
-            print("RETURNED FROM N8N")
-            print("SUCCESS:", success)
+            print("SEND RESULT:", success)
+    
 
             if success:
 
@@ -1159,36 +1130,20 @@ def normalize_name(name):
     )
 def get_employee_email(employee):
 
-    print("===== GOOGLE SHEET LOOKUP =====")
-    print("SEARCH:", employee)
-
     sheet = get_employee_sheet()
 
-    print("BEFORE get_all_records")
     rows = sheet.get_all_records()
-    print("AFTER get_all_records")
-    print("ROW COUNT:", len(rows))
 
-    if not rows:
-        print("NO ROWS FOUND")
-        return None
-
-    print("COLUMN CHECK:")
-    print(rows[0].keys())
+    employee = employee.strip().lower()
 
     for row in rows:
-        print("CHECKING ROW:", row)
 
-        sheet_name = str(row["employee_name"]).strip()
-        print("SHEET NAME:", sheet_name)
+        sheet_name = str(row["employee_name"]).strip().lower()
 
-        if not sheet_name:
-            continue
-
-        if employee.strip().lower().startswith(sheet_name.lower()):
-            print("MATCH FOUND:", row["email"])
+        if employee == sheet_name:
             return row["email"]
-           
+
+    return None
             
 def add_employee_sheet(name,email):
 
