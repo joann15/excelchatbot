@@ -192,10 +192,20 @@ def send_to_n8n(
 
         print("===== N8N PAYLOAD =====")
         print(payload)
-        print("Webhook:", N8N_WEBHOOK)
+        print("ABOUT TO CALL N8N WEBHOOK")
 
-        print("SKIPPING N8N")
-        return True
+        res = requests.post(
+            N8N_WEBHOOK,
+            json=payload,
+            timeout=30
+        )
+
+        print("N8N RESPONSE RECEIVED")
+        print("STATUS:", res.status_code)
+        print("BODY:", res.text)
+
+        return res.status_code == 200
+
 
         # print("POST SENT")
         # print("Status:", res.status_code)
