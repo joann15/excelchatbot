@@ -194,17 +194,14 @@ def send_to_n8n(
         print(payload)
         print("Webhook:", N8N_WEBHOOK)
 
-        res = requests.post(
-            N8N_WEBHOOK,
-            json=payload,
-            timeout=120
-        )
+        print("SKIPPING N8N")
+        return True
 
-        print("POST SENT")
-        print("Status:", res.status_code)
-        print("Body:", res.text)
+        # print("POST SENT")
+        # print("Status:", res.status_code)
+        # print("Body:", res.text)
 
-        return res.status_code == 200
+        # return res.status_code == 200
 
     except Exception as e:
         print("========== N8N ERROR ==========")
@@ -353,10 +350,13 @@ def upload():
     
 @app.route("/debug-db")
 def debug_db():
-
+    print("BEFORE get_employee_sheet")
     sheet = get_employee_sheet()
+    print("AFTER get_employee_sheet")
+    print("BEFORE get_all_records")
 
     rows = sheet.get_all_records()
+    print("AFTER get_all_records")
 
     return jsonify({
         "employees": rows,
@@ -1150,7 +1150,10 @@ def get_employee_email(employee):
 
     sheet = get_employee_sheet()
 
+    print("BEFORE get_all_records")
     rows = sheet.get_all_records()
+    print("AFTER get_all_records")
+    print("ROW COUNT:", len(rows))
 
     if not rows:
         print("NO ROWS FOUND")
@@ -1160,17 +1163,16 @@ def get_employee_email(employee):
     print(rows[0].keys())
 
     for row in rows:
-        print("FULL ROW:", row)
+        print("CHECKING ROW:", row)
 
         sheet_name = str(row["employee_name"]).strip()
-        print("CHECKING:", sheet_name)
+        print("SHEET NAME:", sheet_name)
 
         if not sheet_name:
             continue
 
         if employee.strip().lower().startswith(sheet_name.lower()):
-            print("MATCH FOUND:")
-            print(employee, "=>", row["email"])
+            print("MATCH FOUND:", row["email"])
             return row["email"]
            
             
