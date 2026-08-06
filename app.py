@@ -148,6 +148,7 @@ def extract_tasks(file):
 
 N8N_WEBHOOK = "https://excelchatbot-n8n-production.up.railway.app/webhook/task-manager"
 
+
 def send_to_n8n(
     action,
     task,
@@ -159,6 +160,7 @@ def send_to_n8n(
     value="",
     updates=None
 ):
+    print("SEND_TO_N8N STARTED")
     try:
         print("========== ENTERED send_to_n8n ==========")
         print("ACTION:", action)
@@ -888,6 +890,11 @@ Otherwise return:
 
             task = command_json.get("task", "")
             employees = command_json.get("employees", [])
+
+            print("ABOUT TO CALL SEND_TO_N8N")
+            print("TASK:", task)
+            print("EMPLOYEES:", employees)
+            print("DRIVE:", LAST_DRIVE_FILE_ID)
 
             success = send_to_n8n(
                 "create",
