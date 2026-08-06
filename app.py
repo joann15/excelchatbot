@@ -891,33 +891,16 @@ Otherwise return:
                 command_json.get("close", ""),
                 LAST_DRIVE_FILE_ID
             )
-            print("SEND RESULT:", success)
-    
+            print("AFTER SEND_TO_N8N SUCCESS =", success)
+            print("SUCCESS TYPE =", type(success))
 
-            if success:
-
-                if isinstance(employees, list):
-                    employee_text = ", ".join(map(str, employees))
-                else:
-                    employee_text = str(employees)
-
-                print("FINAL RESPONSE:", employee_text)
-
-                response = {
-                    "answer": f"Task '{task}' assigned to {employee_text}."
-                }
-
-                print("FINAL JSON RESPONSE:")
-                print(response)
-
-                print("BEFORE CREATE RETURN")
-                return jsonify(response)
-
-            print("CREATE FAILED RETURNING TO FRONTEND")
-
+        if success:
+            print("ENTERED SUCCESS BLOCK")
             return jsonify({
-                "answer": "Failed to create task. Please check employee name."
+                "answer": "DEBUG: N8N SUCCESS"
             })
+
+            
 
         # ====================================================
         # DELETE TASK
@@ -1107,15 +1090,13 @@ QUESTION
         return jsonify({
             "answer": res.choices[0].message.content
         })
-    except Exception as e:
-        print("========== REAL CHAT ERROR ==========")
-        print(type(e))
-        print(str(e))
+    except Exception:
+        print("========== CHAT CRASH ==========")
         traceback.print_exc()
-        return jsonify({
-        "answer": "Backend crashed",
-        "error": str(e)
-    }),500
+
+    return jsonify({
+        "answer": "Backend crashed"
+    }), 500
 
 def normalize_name(name):
     if not name:
