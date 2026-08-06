@@ -187,10 +187,15 @@ def send_to_n8n(
             json=payload,
             timeout=120
         )
+        print("N8N RESPONSE STATUS:", res.status_code)
+        print("N8N RESPONSE BODY:", res.text)
 
-        print("N8N STATUS:", res.status_code)
-
-        return res.status_code == 200
+        if res.status_code == 200:
+            print("N8N SUCCESS")
+            return True
+        else:
+            print("N8N FAILED")
+            return False
 
     except Exception as e:
         print("send_to_n8n FAILED:", e)
@@ -883,24 +888,33 @@ Otherwise return:
             print("EMPLOYEES:", employees)
             print("DRIVE:", LAST_DRIVE_FILE_ID)
 
-            success = send_to_n8n(
-                "create",
-                task,
-                employees,
-                command_json.get("open", ""),
-                command_json.get("close", ""),
-                LAST_DRIVE_FILE_ID
-            )
-            print("AFTER SEND_TO_N8N SUCCESS =", success)
-            print("SUCCESS TYPE =", type(success))
+            try:
+                success = send_to_n8n(
+                    "create",
+                    task,
+                    employees,
+                    command_json.get("open", ""),
+                    command_json.get("close", ""),
+                    LAST_DRIVE_FILE_ID
+                )
+                print("SEND_TO_N8N RETURN VALUE:", success)
+
+            except Exception as e:
+                print("CREATE FLOW CRASHED:", e)
+                traceback.print_exc()
+
+                return jsonify({
+                    "answer": "Task created but chatbot response failed",
+                    "error": str(e)
+                }), 500
+        print("AFTER SEND_TO_N8N SUCCESS =", success)
+        print("SUCCESS TYPE =", type(success))
 
         if success:
             print("ENTERED SUCCESS BLOCK")
             return jsonify({
                 "answer": "DEBUG: N8N SUCCESS"
             })
-
-            
 
         # ====================================================
         # DELETE TASK
