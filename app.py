@@ -204,6 +204,8 @@ def send_to_n8n(
         print("STATUS:", res.status_code)
         print("BODY:", res.text)
 
+        print("ABOUT TO RETURN FROM send_to_n8n")
+        print("STATUS CODE:", res.status_code)
         return res.status_code == 200
 
 
@@ -914,6 +916,8 @@ Otherwise return:
                 command_json.get("close", ""),
                 LAST_DRIVE_FILE_ID
             )
+            print("SEND_TO_N8N RETURN VALUE:", success)
+            print("TYPE:", type(success))
 
             print("========== AFTER N8N ==========")
             print("RETURNED FROM N8N")
