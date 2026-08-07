@@ -893,6 +893,9 @@ Otherwise return:
                     LAST_DRIVE_FILE_ID
                     )
                 print("N8N RESULT:", success)
+                return jsonify({
+                    "answer": "Task created successfully"
+                })
 
             except Exception as e:
                 import traceback
@@ -903,15 +906,15 @@ Otherwise return:
                 }), 500
 
 
-            if success:
-                print("RETURNING SUCCESS RESPONSE")
-                return jsonify({
-                    "answer": f"Task '{task}' assigned successfully."
-                })
-            print("N8N FAILED")
-            return jsonify({
-                "answer": "Task creation failed."
-            }), 500
+           # if success:
+        #    print("RETURNING SUCCESS RESPONSE")
+             #   return jsonify({
+              #      "answer": f"Task '{task}' assigned successfully."
+               # })
+            #print("N8N FAILED")
+           # return jsonify({
+            #    "answer": "Task creation failed."
+            #}), 500
 
         # ====================================================
         # DELETE TASK
