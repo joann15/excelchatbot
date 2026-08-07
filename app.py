@@ -865,13 +865,13 @@ Otherwise return:
         # Make sure a Job Card exists
         # -------------------------
         if action != "chat":
-
             if len(DB) == 0:
                 return jsonify({
                     "answer": "Please upload a Job Card first."
                 })
+        print("REACHED ACTION HANDLER:", action)
 
-        excel_path = DB[0]["path"]
+       
 
         # ====================================================
         # CREATE TASK
@@ -894,7 +894,8 @@ Otherwise return:
                     )
                 print("N8N RESULT:", success)
                 return jsonify({
-                    "answer": "Task created successfully"
+                    "answer": "Task created successfully",
+                    "success": success
                 })
 
             except Exception as e:
@@ -1104,12 +1105,16 @@ QUESTION
         return jsonify({
             "answer": res.choices[0].message.content
         })
-    except Exception:
+    except Exception as e:
         print("========== CHAT CRASH ==========")
-        traceback.print_exc()
+        print("ERROR:", str(e))
+
+    import traceback
+    traceback.print_exc()
 
     return jsonify({
-        "answer": "Backend crashed"
+        "answer": "Backend crashed",
+        "error": str(e)
     }), 500
 
 def normalize_name(name):
