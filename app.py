@@ -881,8 +881,7 @@ Otherwise return:
             print("CREATE BLOCK ENTERED")
             task = command_json.get("task", "")
             employees = command_json.get("employees", [])
-            print("TASK:", task)
-            print("EMPLOYEES:", employees)
+
 
             try:
                 success = send_to_n8n(
@@ -896,7 +895,7 @@ Otherwise return:
                 print("N8N RESULT:", success)
 
             except Exception as e:
-                print("SEND_TO_N8N ERROR:", e)
+                import traceback
                 traceback.print_exc()
 
                 return jsonify({
@@ -1582,6 +1581,14 @@ def test_email(name):
         "name": name,
         "email": get_employee_email(name)
     })
+
+@app.errorhandler(Exception)
+def handle_error(e):
+    import traceback
+    traceback.print_exc()
+    return jsonify({
+        "error": str(e)
+    }), 500
 
 # ---------------------------
 # RUN
