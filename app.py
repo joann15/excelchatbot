@@ -976,20 +976,20 @@ Otherwise return:
             print("CREATE BLOCK ENTERED")
             task = command_json.get("task", "")
             employees = command_json.get("employees", [])
-
+            open_date = command_json.get("open", "")
+            close_date = command_json.get("close", "")
 
             try:
                 result = create_task_logic(
                     task=task,
                     employees=employees,
-                    open_date=command_json.get("open", ""),
-                    close_date=command_json.get("close", ""),
+                    open_date=open_date,
+                    close_date=close_date,
                     drive_file_id=LAST_DRIVE_FILE_ID
                 )
                 print("CREATE LOGIC RESULT:", result)
 
                 if not result.get("success", False):
-
                     return jsonify({
                         "answer": result.get(
                             "message",
@@ -998,13 +998,31 @@ Otherwise return:
                         "success": False
                     }), 400
 
+                print("TASK CREATED — STARTING N8N EMAIL")
+                try:
+                    n8n_result = send_to_n8n(
+                        action="create",
+                        task=task,
+                        employees=employees,
+                        open_date=open_date,
+                        close_date=close_date,
+                        drive_file_id=LAST_DRIVE_FILE_ID
+                    )
+                    print("N8N EMAIL RESULT:", n8n_result)
+                except Exception as n8n_error:
+                    print("N8N EMAIL FAILED:", str(n8n_error))
+
+                    import traceback
+                    traceback.print_exc()
+                    n8n_result = False
+
                 return jsonify({
                     "answer": f"Task '{task}' created successfully.",
-                    "success": True
+                    "success": True,
+                    "email_sent": n8n_result
                 }), 200
 
             except Exception as e:
-
                 print("========== CHAT CREATE ERROR ==========")
                 print("ERROR:", str(e))
 
@@ -1016,18 +1034,6 @@ Otherwise return:
                     "success": False,
                     "error": str(e)
                 }), 500
-                
-
-
-           # if success:
-        #    print("RETURNING SUCCESS RESPONSE")
-             #   return jsonify({
-              #      "answer": f"Task '{task}' assigned successfully."
-               # })
-            #print("N8N FAILED")
-           # return jsonify({
-            #    "answer": "Task creation failed."
-            #}), 500
 
         # ====================================================
         # DELETE TASK
