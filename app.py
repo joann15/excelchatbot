@@ -1000,14 +1000,14 @@ Otherwise return:
 
                 print("TASK CREATED — STARTING N8N EMAIL")
                 try:
-                    n8n_result = send_to_n8n(
-                        action="create",
-                        task=task,
-                        employees=employees,
-                        open_date=open_date,
-                        close_date=close_date,
-                        drive_file_id=LAST_DRIVE_FILE_ID
-                    )
+                   # n8n_result = send_to_n8n(
+                    #    action="create",
+                     #   task=task,
+                      #  employees=employees,
+                       # open_date=open_date,
+                        #close_date=close_date,
+                       # drive_file_id=LAST_DRIVE_FILE_ID
+                    #)
                     print("N8N EMAIL RESULT:", n8n_result)
                 except Exception as n8n_error:
                     print("N8N EMAIL FAILED:", str(n8n_error))
