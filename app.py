@@ -188,7 +188,7 @@ def send_to_n8n(
         res = requests.post(
             N8N_WEBHOOK,
             json=payload,
-            timeout=120
+            timeout=10
         )
 
         print("========== AFTER N8N ==========")
@@ -997,17 +997,17 @@ Otherwise return:
                         ),
                         "success": False
                     }), 400
-
-                print("TASK CREATED — STARTING N8N EMAIL")
+                
+                
                 try:
-                   # n8n_result = send_to_n8n(
-                    #    action="create",
-                     #   task=task,
-                      #  employees=employees,
-                       # open_date=open_date,
-                        #close_date=close_date,
-                       # drive_file_id=LAST_DRIVE_FILE_ID
-                    #)
+                    n8n_result = send_to_n8n(
+                        action="create",
+                        task=task,
+                        employees=employees,
+                        open_date=open_date,
+                        close_date=close_date,
+                        drive_file_id=LAST_DRIVE_FILE_ID
+                    )
                     print("N8N EMAIL RESULT:", n8n_result)
                 except Exception as n8n_error:
                     print("N8N EMAIL FAILED:", str(n8n_error))
