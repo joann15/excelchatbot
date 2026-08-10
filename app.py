@@ -363,39 +363,42 @@ def debug_db():
         "count": len(rows)
     })
 
+def create_task_logic(
+    task,
+    employees,
+    open_date,
+    close_date,
+    drive_file_id,
+    emails=None
+):
+    emails = emails or []
 
-@app.route("/create-task", methods=["POST"])
-def create_task():
+    print("===== CREATE TASK LOGIC =====")
+    print("Task:", task)
+    print("Employees:", employees)
+    print("Open:", open_date)
+    print("Close:", close_date)
+
+    if not emails:
+        print("No emails received, looking up...")
+
+        emails = []
+
+        for employee in employees:
+            email = get_employee_email(employee)
+
+            if email:
+                emails.append(email)
+            else:
+                print("Missing email for:", employee)
+
+    # -----------------------------
+    # Download Excel
+    # -----------------------------
+
+    local_file = download_file(drive_file_id)
+
     try:
-        data = request.json
-
-        print("===== CREATE TASK =====")
-        print(data)
-
-        task = data["task"]
-        employees = data["employees"]
-        open_date = data["open"]
-        close_date = data["close"]
-        drive_file_id = data["drive_file_id"]
-
-        emails = data.get("emails", [])
-        print("EMAILS RECEIVED FROM N8N:", emails)
-
-        if not emails:
-            print("No emails received, looking up...")
-            
-            emails = []
-
-            for employee in employees:
-                email = get_employee_email(employee)
-
-                if email:
-                    emails.append(email)
-                else:
-                    print("Missing email for:", employee)
-
-        # Download Excel from Drive
-        local_file = download_file(drive_file_id)
 
         wb = load_workbook(local_file)
         ws = wb.active
@@ -404,66 +407,113 @@ def create_task():
 
         print("Headers:", headers)
 
+        # -----------------------------
         # Find employee columns
+        # -----------------------------
+
         employee_cols = []
+
         for employee in employees:
+
             found = False
 
             for i, header in enumerate(headers):
-                if header and str(header).strip().lower() == employee.strip().lower():
+
+                if (
+                    header
+                    and str(header).strip().lower()
+                    == employee.strip().lower()
+                ):
                     employee_cols.append(i + 1)
                     found = True
                     break
 
             if not found:
-                return jsonify({
-                    "error": f"Employee '{employee}' not found"
-                }), 400
+                return {
+                    "success": False,
+                    "message": f"Employee '{employee}' not found"
+                }
 
-
+        # -----------------------------
         # Find empty row
+        # -----------------------------
+
         new_row = ws.max_row + 1
 
         for r in range(2, ws.max_row + 1):
+
             if ws.cell(r, 2).value is None:
                 new_row = r
                 break
 
+        # -----------------------------
+        # Columns
+        # -----------------------------
 
-        # Task column
         task_col = 2
 
         open_col = headers.index("Open") + 1
         close_col = headers.index("Close") + 1
 
+        # -----------------------------
+        # Insert task
+        # -----------------------------
 
-                # Insert task
         ws.cell(new_row, task_col).value = task
 
+        # -----------------------------
+        # Dates
+        # -----------------------------
 
         open_dt = None
         close_dt = None
 
         if open_date:
-            open_dt = datetime.strptime(open_date, "%Y-%m-%d")
+            open_dt = datetime.strptime(
+                open_date,
+                "%Y-%m-%d"
+            )
 
         if close_date:
-            close_dt = datetime.strptime(close_date, "%Y-%m-%d")
-
+            close_dt = datetime.strptime(
+                close_date,
+                "%Y-%m-%d"
+            )
 
         if open_dt:
-            ws.cell(new_row, open_col).value = open_dt
-            ws.cell(new_row, open_col).number_format = "dd-mmm"
+
+            ws.cell(
+                new_row,
+                open_col
+            ).value = open_dt
+
+            ws.cell(
+                new_row,
+                open_col
+            ).number_format = "dd-mmm"
 
         if close_dt:
-            ws.cell(new_row, close_col).value = close_dt
-            ws.cell(new_row, close_col).number_format = "dd-mmm"
 
+            ws.cell(
+                new_row,
+                close_col
+            ).value = close_dt
 
+            ws.cell(
+                new_row,
+                close_col
+            ).number_format = "dd-mmm"
+
+        # -----------------------------
         # Assign employees
+        # -----------------------------
+
         for col in employee_cols:
 
-            cell = ws.cell(new_row, col)
+            cell = ws.cell(
+                new_row,
+                col
+            )
 
             cell.value = 1
 
@@ -473,51 +523,88 @@ def create_task():
                 end_color="FF7A3F00"
             )
 
+        # -----------------------------
+        # Save
+        # -----------------------------
 
         wb.save(local_file)
+
         print("Workbook saved successfully.")
-        print("Starting upload to Cloud Storage...")
-        update_file(drive_file_id, local_file)
-        print("Cloud Storage upload finished.")
 
+        # -----------------------------
+        # Upload to Drive
+        # -----------------------------
 
-        # Upload updated Excel
         update_file(
             drive_file_id,
             local_file
         )
 
+        print("Cloud Storage upload finished.")
 
+        # -----------------------------
         # Refresh chatbot memory
+        # -----------------------------
+
         new_tasks = extract_tasks(local_file)
 
         if DB:
             DB[0]["tasks"] = new_tasks
 
-
-        os.remove(local_file)
-
-
         print("CREATE SUCCESS")
 
-        print("FINAL EMAILS BEFORE RETURN:", data.get("emails"))
-        return jsonify({
+        return {
+            "success": True,
             "message": "CREATE SUCCESS",
             "task": task,
             "employees": employees,
-            "emails": data.get("emails", emails),
+            "emails": emails,
             "open": open_date,
             "close": close_date
-        })
+        }
+
+    finally:
+
+        try:
+            os.remove(local_file)
+        except Exception as e:
+            print("Could not remove temporary file:", e)
+
+@app.route("/create-task", methods=["POST"])
+def create_task():
+
+    try:
+
+        data = request.json
+
+        print("===== CREATE TASK ENDPOINT =====")
+        print(data)
+
+        result = create_task_logic(
+            task=data["task"],
+            employees=data["employees"],
+            open_date=data["open"],
+            close_date=data["close"],
+            drive_file_id=data["drive_file_id"],
+            emails=data.get("emails", [])
+        )
+
+        if not result["success"]:
+            return jsonify(result), 400
+
+        return jsonify(result), 200
+
     except Exception as e:
+
         print("========== CREATE TASK ERROR ==========")
-    traceback.print_exc()
 
-    return jsonify({
-        "error": str(e)
-    }), 500
+        import traceback
+        traceback.print_exc()
 
-
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
     
 # update excel
 from openpyxl import load_workbook
@@ -892,27 +979,44 @@ Otherwise return:
 
 
             try:
-                success = send_to_n8n(
-                    "create",
-                    task,
-                    employees,
-                    command_json.get("open", ""),
-                    command_json.get("close", ""),
-                    LAST_DRIVE_FILE_ID
-                    )
-                print("N8N RESULT:", success)
+                result = create_task_logic(
+                    task=task,
+                    employees=employees,
+                    open_date=command_json.get("open", ""),
+                    close_date=command_json.get("close", ""),
+                    drive_file_id=LAST_DRIVE_FILE_ID
+                )
+                print("CREATE LOGIC RESULT:", result)
+
+                if not result.get("success", False):
+
+                    return jsonify({
+                        "answer": result.get(
+                            "message",
+                            "Task creation failed."
+                        ),
+                        "success": False
+                    }), 400
+
                 return jsonify({
-                    "answer": "Task created successfully",
-                    "success": success
-                })
+                    "answer": f"Task '{task}' created successfully.",
+                    "success": True
+                }), 200
 
             except Exception as e:
+
+                print("========== CHAT CREATE ERROR ==========")
+                print("ERROR:", str(e))
+
                 import traceback
                 traceback.print_exc()
 
                 return jsonify({
-                    "answer": "Task created but response failed"
+                    "answer": "Task creation failed.",
+                    "success": False,
+                    "error": str(e)
                 }), 500
+                
 
 
            # if success:
