@@ -1250,7 +1250,8 @@ def delete_task():
 
     return jsonify({
         "success": True,
-        "message": f"{task} deleted.",
+        "message": f"{task} deleted successfully.",
+        "task": task,
         "employees": employees,
         "emails": emails
     })
