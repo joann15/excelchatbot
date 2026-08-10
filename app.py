@@ -165,7 +165,7 @@ def send_to_n8n(
 
         for employee in employees:
             email = get_employee_email(employee)
-            
+
             if email:
                 emails.append(email)
 
@@ -182,23 +182,31 @@ def send_to_n8n(
             "drive_file_id": drive_file_id
         }
 
+        print("========== BEFORE N8N ==========")
+        print("PAYLOAD:", payload)
+
         res = requests.post(
             N8N_WEBHOOK,
             json=payload,
             timeout=120
         )
-        print("N8N RESPONSE STATUS:", res.status_code)
-        print("N8N RESPONSE BODY:", res.text)
 
-        if res.status_code == 200:
+        print("========== AFTER N8N ==========")
+        print("STATUS:", res.status_code)
+        print("BODY:", res.text)
+
+        if 200 <= res.status_code < 300:
             print("N8N SUCCESS")
             return True
-        else:
-            print("N8N FAILED")
-            return False
+
+        print("N8N FAILED")
+        return False
 
     except Exception as e:
-        print("send_to_n8n FAILED:", e)
+        print("========== N8N REQUEST EXCEPTION ==========")
+        print("ERROR:", repr(e))
+        import traceback
+        traceback.print_exc()
         return False
     
 def find_task_details(excel_path, task_name):
