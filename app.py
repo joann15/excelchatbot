@@ -1039,96 +1039,168 @@ Otherwise return:
         # DELETE TASK
         # ====================================================
 
-
         elif action == "delete":
             task = command_json.get("task", "")
 
-            local_file = download_file(LAST_DRIVE_FILE_ID)
-
-            details = find_task_details(
-                local_file,
-                task
-            )
-
-            os.remove(local_file)
-
-            success = send_to_n8n(
-                "delete",
-                task,
-                details["employees"],
-                "",
-                "",
-                LAST_DRIVE_FILE_ID
-            )
-
-            if success:
-                return jsonify({
-                    "answer": f"Task '{task}' deleted."
-                })
-
-            return jsonify({
-                "answer": "Failed to delete task."
-            })
-        # ====================================================
-        # UPDATE TASK
-        # ====================================================
-        elif action == "update":
-            task = command_json.get("task", "")
-            updates = command_json.get("updates", [])
-
-            if command_json.get("employee"):
-                employees = [command_json["employee"]]
-            else:
-                local_file = download_file(LAST_DRIVE_FILE_ID)
-                details = find_task_details(local_file, task)
-                os.remove(local_file)
-                employees = details["employees"]
-
-            success = True
-            performed_updates = []
-
-            for update in updates:
-                response = requests.post(
-                    "https://excelchatbot.onrender.com/update-task",
-                    json={
-                        "task": task,
-                        "field": update["field"],
-                        "value": update["value"],
-                        "employees": employees,
-                        "selected_employee": command_json.get("employee", ""),
-                        "drive_file_id": LAST_DRIVE_FILE_ID
-                    },
-                    timeout=30
+            try:
+                result = delete_task_logic(
+                    task=task,
+                    drive_file_id=LAST_DRIVE_FILE_ID
                 )
+                print("DELETE LOGIC RESULT:", result)
 
-                if response.status_code == 200:
-                    performed_updates.append({
-                        "field": update["field"],
-                        "value": update["value"]
-                    })
-                else:
-                    success = False
+                if not result.get("success", False):
+                    return jsonify({
+                        "answer": result.get(
+                            "message",
+                            "Task deletion failed."
+                        ),
+                        "success": False
+                    }), 400
 
-            print("UPDATE SUCCESS VALUE:", success)
-            if success:
-                send_to_n8n(
-                    action="update",
+                employees = result.get("employees", [])
+
+                n8n_result = send_to_n8n(
+                    action="delete",
                     task=task,
                     employees=employees,
                     open_date="",
                     close_date="",
-                    drive_file_id=LAST_DRIVE_FILE_ID,
-                    updates=performed_updates
+                    drive_file_id=LAST_DRIVE_FILE_ID
                 )
 
+                print("DELETE N8N RESULT:", n8n_result)
                 return jsonify({
-                    "answer": f"Task '{task}' updated successfully and employee notified."
-                })
+                    "answer": f"Task '{task}' deleted successfully.",
+                    "success": True,
+                    "email_sent": n8n_result
+                }), 200
+
+            except Exception as e:
+                print("========== CHAT DELETE ERROR ==========")
+                print("ERROR:", str(e))
+                import traceback
+                traceback.print_exc()
 
             return jsonify({
-                "answer": "Failed to update task."
-            })
+                "answer": "Task deletion failed.",
+                "success": False,
+                "error": str(e)
+            }), 500
 
+
+        # ====================================================
+        # UPDATE TASK
+        # ====================================================
+        elif action == "update":
+            print("========== CHAT UPDATE ==========")
+
+            task = command_json.get("task", "")
+            updates = command_json.get("updates", [])
+
+            try:
+                if command_json.get("employee"):
+                    employees = [
+                        command_json["employee"]
+                    ]
+                else:
+                    local_file = download_file(
+                    LAST_DRIVE_FILE_ID
+                )
+
+                details = find_task_details(
+                    local_file,
+                    task
+                )
+                os.remove(local_file)
+                employees = details.get(
+                    "employees",
+                        []
+                    )
+                print("UPDATE EMPLOYEES:", employees)
+
+                performed_updates = []
+                for update in updates:
+                    field = update["field"]
+                    value = update["value"]
+                    
+                    result = update_task_logic(
+                        task=task,
+                        field=field,
+                        value=value,
+                        employees=employees,
+                        selected_employee=command_json.get(
+                            "employee",
+                            ""
+                        ),
+                        drive_file_id=LAST_DRIVE_FILE_ID
+                    )
+
+                    print(
+                        "UPDATE LOGIC RESULT:",
+                        result
+                    )
+                    if not result.get("success", False):
+
+                        return jsonify({
+                            "answer": result.get(
+                            "message",
+                            "Task update failed."
+                        ),
+                        "success": False
+                        }), 400
+
+                    performed_updates.append({
+                        "field": field,
+                        "value": value
+                    })
+
+                    try:
+                        n8n_result = send_to_n8n(
+                        action="update",
+                        task=task,
+                        employees=employees,
+                        open_date="",
+                        close_date="",
+                        drive_file_id=LAST_DRIVE_FILE_ID,
+                        updates=performed_updates
+                        )
+                        print(
+                            "UPDATE N8N RESULT:",
+                            n8n_result
+                        )
+
+                    except Exception as n8n_error:
+                        print(
+                            "UPDATE N8N ERROR:",
+                            str(n8n_error)
+                        )
+                        
+
+                        import traceback
+                        traceback.print_exc()   
+                        n8n_result = False
+
+                        return jsonify({
+                            "answer": (
+                                f"Task '{task}' updated successfully."
+                            ),
+                            "success": True,
+                            "email_sent": n8n_result
+                        }), 200
+
+            except Exception as e:
+                print("========== CHAT UPDATE ERROR ==========")
+                print("ERROR:", str(e))
+
+                import traceback
+                traceback.print_exc()
+
+                return jsonify({
+                    "answer": "Task update failed.",
+                    "success": False,
+                    "error": str(e)
+                }), 500
         # ====================================================
         # ADD EMPLOYEE
         # ====================================================
@@ -1137,34 +1209,59 @@ Otherwise return:
             email = command_json.get("email", "")
 
             try:
-                create_employee(
-                employee,
-                email,
-                LAST_DRIVE_FILE_ID
+                result = add_employee_logic(
+                employee=employee,
+                email=email,
+                drive_file_id=LAST_DRIVE_FILE_ID
                 )
+                print("ADD EMPLOYEE RESULT:", result)
+                
 
-                print("EMPLOYEE CREATED:", employee)
+                if not result.get("success", False):
+                    return jsonify({
+                        "answer": result.get(
+                        "message",
+                        "Failed to add employee."
+                        ),
+                        "success": False
+                    }), 400
 
-                success = send_to_n8n(
-                    action="welcome_employee",
-                    task="",
-                    employees=[employee],
-                    open_date="",
-                    close_date="",
-                    drive_file_id=LAST_DRIVE_FILE_ID
-                )
+                try:
+                    n8n_result = send_to_n8n(
+                        action="welcome_employee",
+                        task="",
+                        employees=[employee],
+                        open_date="",
+                        close_date="",
+                        drive_file_id=LAST_DRIVE_FILE_ID
+                    )
 
-                print("WELCOME EMAIL N8N RESULT:", success)
+                    print("WELCOME EMAIL N8N RESULT:", n8n_result)
 
-                return jsonify({
-                    "answer": f"{employee} added successfully."
-                })
+                except Exception as n8n_error:
+                    print("WELCOME EMAIL FAILED:", str(n8n_error))
+                    import traceback
+                    traceback.print_exc()
+                    n8n_result = False
+
+                    return jsonify({
+                        "answer": f"{employee} added successfully.",
+                        "success": True,
+                        "email_sent": n8n_result
+                    }), 200
 
             except Exception as e:
-                print("CHAT ERROR:", str(e))
+                print("========== ADD EMPLOYEE ERROR ==========")
+                print("ERROR:", str(e))
+
                 import traceback
                 traceback.print_exc()
-                return jsonify({"error": str(e)}), 500
+                return jsonify({
+                    "answer": "Failed to add employee.",
+                    "success": False,
+                    "error": str(e)
+                }), 500
+               
         # ====================================================
         # NORMAL CHAT
         # ====================================================
@@ -1303,76 +1400,172 @@ def create_employee(employee, email, drive_file_id):
 
     new_tasks = extract_tasks(local_file)
 
-    if DB:
-        DB[0]["tasks"] = new_tasks
-
-    os.remove(local_file)
-
-    return True
-
-@app.route("/delete-task", methods=["POST"])
-def delete_task():
-    data = request.json
-
-    task = data["task"]
-    drive_file_id = data["drive_file_id"]
-
-    local_file = download_file(drive_file_id)
-
-    # Get assigned employees BEFORE deleting the task
-    task_details = find_task_details(local_file, task)
-
-    employees = task_details.get("employees", [])
-    emails = [get_employee_email(emp) for emp in employees]
-
-    wb = load_workbook(local_file)
-    ws = wb.active
-
-    deleted = False
-
-    for r in range(2, ws.max_row + 1):
-        if str(ws.cell(r, 2).value).strip().lower() == task.strip().lower():
-            ws.delete_rows(r)
-            deleted = True
-            break
-
-    if not deleted:
-        os.remove(local_file)
-
-        return jsonify({
-            "success": False,
-            "message": "Task not found."
-        }), 404
-
-    wb.save(local_file)
-    update_file(drive_file_id, local_file)
     global DB
-    new_tasks = extract_tasks(local_file)
     DB = [{
         "file": "jobcard.xlsx",
         "path": local_file,
         "tasks": new_tasks
     }]
 
-    new_tasks = extract_tasks(local_file)
+    os.remove(local_file)
 
-    if DB:
-        DB[0]["tasks"] = new_tasks
+    return True
 
-    print(f"Deleted task: {task}")
+def delete_task_logic(task, drive_file_id):
+
+    local_file = None
 
     try:
-        os.remove(local_file)
-    except Exception as e:
-        print("Couldn't delete temporary file:", e)
 
-    return jsonify({
-        "success": True,
-        "message": f"{task} deleted successfully.",
-        "task": task,
-        "employees": employees,
-        "emails": emails
-    })
+        print("========== DELETE TASK LOGIC ==========")
+        print("Task:", task)
+
+        local_file = download_file(drive_file_id)
+
+        wb = load_workbook(local_file)
+        ws = wb.active
+
+        headers = [cell.value for cell in ws[1]]
+
+        # -----------------------------------------
+        # Find task row
+        # -----------------------------------------
+
+        task_row = None
+
+        for r in range(2, ws.max_row + 1):
+
+            cell_value = ws.cell(r, 2).value
+
+            if cell_value is None:
+                continue
+
+            if str(cell_value).strip().lower() == task.strip().lower():
+                task_row = r
+                break
+
+        if task_row is None:
+
+            return {
+                "success": False,
+                "message": f"Task '{task}' not found."
+            }
+
+        # -----------------------------------------
+        # Find employees assigned to task
+        # BEFORE deleting row
+        # -----------------------------------------
+
+        open_col = headers.index("Open") + 1
+
+        employees = []
+
+        for c in range(3, open_col):
+
+            header = headers[c - 1]
+
+            if header is None:
+                continue
+
+            cell = ws.cell(task_row, c)
+
+            if cell.value is not None:
+
+                employees.append(str(header).strip())
+
+        print("Employees assigned:", employees)
+
+        # -----------------------------------------
+        # Delete row
+        # -----------------------------------------
+
+        ws.delete_rows(task_row, 1)
+
+        # -----------------------------------------
+        # Save Excel
+        # -----------------------------------------
+
+        wb.save(local_file)
+
+        print("Workbook saved after delete.")
+
+        # -----------------------------------------
+        # Upload back to Drive
+        # -----------------------------------------
+
+        update_file(
+            drive_file_id,
+            local_file
+        )
+
+        print("Drive updated after delete.")
+
+        # -----------------------------------------
+        # Refresh DB
+        # -----------------------------------------
+
+        new_tasks = extract_tasks(local_file)
+
+        if DB:
+            DB[0]["tasks"] = new_tasks
+
+        print("DELETE SUCCESS")
+
+        return {
+            "success": True,
+            "task": task,
+            "employees": employees
+        }
+
+    finally:
+
+        if local_file:
+
+            try:
+                os.remove(local_file)
+            except Exception:
+                pass
+@app.route("/delete-task", methods=["POST"])
+def delete_task():
+    try:
+        data = request.json
+
+        task = data["task"]
+        drive_file_id = data["drive_file_id"]
+
+        print("========== DELETE TASK ROUTE ==========")
+        print("Task:", task)
+
+        result = delete_task_logic(
+            task=task,
+            drive_file_id=drive_file_id
+        )
+
+        print("DELETE LOGIC RESULT:", result)
+
+        if not result.get("success", False):
+            return jsonify(result), 404
+
+        return jsonify({
+            "success": True,
+            "message": f"{task} deleted successfully.",
+            "task": task,
+            "employees": result.get("employees", [])
+        }), 200
+
+    except Exception as e:
+
+        print("========== DELETE TASK ERROR ==========")
+        print("ERROR:", str(e))
+
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({
+            "success": False,
+            "message": "Delete task failed.",
+            "error": str(e)
+        }), 500
 
 @app.route("/task-details", methods=["POST"])
 def task_details():
@@ -1402,287 +1595,398 @@ def task_details():
         print("TASK DETAILS ERROR:", e)
         return jsonify({"error": str(e)}), 500
     
-@app.route("/update-task", methods=["POST"])
-def update_task():
-    
-    data = request.json
-    
-    print("========== UPDATE ==========")
-    print(data)
-    
-    task = data["task"]
-    field = data["field"].lower()
-    value = data["value"]
-    employees = data.get("employees", [])
-    employee = data.get("selected_employee", "")
-    emails = data.get("emails", [])
-   
+def update_task_logic(
+    task,
+    field,
+    value,
+    employees,
+    selected_employee,
+    drive_file_id
+):
 
-    print("Task:", task)
-    print("Field:", field)
-    print("Value:", value)
-    print("Employees:", employees)
-    print("Employee selected:", employee)
+    local_file = None
 
+    try:
 
-    field_map = {
-        "name": "task",
-        "opendate": "open",
-        "closedate": "close"
-    }
+        print("========== UPDATE TASK LOGIC ==========")
+        print("Task:", task)
+        print("Field:", field)
+        print("Value:", value)
+        print("Employees:", employees)
+        print("Selected employee:", selected_employee)
 
-    field = field_map.get(field, field)
+        field = field.lower()
 
-    drive_file_id = data["drive_file_id"]
-    local_file = download_file(drive_file_id)
-
-    wb = load_workbook(local_file)
-    ws = wb.active
-
-    headers = [cell.value for cell in ws[1]]
-
-    open_col = headers.index("Open") + 1
-    close_col = headers.index("Close") + 1
-
-    # -----------------------
-    # Find task row
-    # -----------------------
-
-    task_row = None
-
-    for r in range(2, ws.max_row + 1):
-        if str(ws.cell(r, 2).value).strip().lower() == task.strip().lower():
-            task_row = r
-            break
-
-    if task_row is None:
-        return jsonify({
-            "success": False,
-            "message": "Task not found."
-        }), 404
-
-    # ==================================================
-    # STATUS UPDATE
-    # ==================================================
-
-    if field == "status":
-
-        status_colors = {
-            "done": "FF6AA84F",
-            "due": "FFB7B7B7",
-            "half-done": "FF6FA8DC",
-            "redo": "FFFF0000",
-            "late": "FFE84499",
-            "on hold": "FFBF8E00",
-            "almost ready": "FF00FFFF",
-            "just started": "FF7A3F00",
-            "na": "FFFFF2CC"
+        field_map = {
+            "name": "task",
+            "opendate": "open",
+            "closedate": "close"
         }
 
-        if value.lower() not in status_colors:
-            return jsonify({
+        field = field_map.get(field, field)
+
+        # -----------------------------------------
+        # Download Excel
+        # -----------------------------------------
+
+        local_file = download_file(drive_file_id)
+
+        wb = load_workbook(local_file)
+        ws = wb.active
+
+        headers = [cell.value for cell in ws[1]]
+
+        open_col = headers.index("Open") + 1
+        close_col = headers.index("Close") + 1
+
+        # -----------------------------------------
+        # Find task row
+        # -----------------------------------------
+
+        task_row = None
+
+        for r in range(2, ws.max_row + 1):
+
+            cell_value = ws.cell(r, 2).value
+
+            if cell_value is None:
+                continue
+
+            if str(cell_value).strip().lower() == task.strip().lower():
+
+                task_row = r
+                break
+
+        if task_row is None:
+
+            return {
                 "success": False,
-                "message": "Unknown status."
-            }), 400
+                "message": f"Task '{task}' not found."
+            }
 
-        fill = PatternFill(
-            fill_type="solid",
-            start_color=status_colors[value.lower()],
-            end_color=status_colors[value.lower()]
-        )
+        # ==================================================
+        # STATUS UPDATE
+        # ==================================================
 
-        # ----------------------------
-        # If employee specified
-        # ----------------------------
+        if field == "status":
 
-        if employee:
+            status_colors = {
+                "done": "FF6AA84F",
+                "due": "FFB7B7B7",
+                "half-done": "FF6FA8DC",
+                "redo": "FFFF0000",
+                "late": "FFE84499",
+                "on hold": "FFBF8E00",
+                "almost ready": "FF00FFFF",
+                "just started": "FF7A3F00",
+                "na": "FFFFF2CC"
+            }
 
-            employee_col = None
+            status = value.lower()
 
-            for i, header in enumerate(headers):
-                print(i + 1, header)
-                
-                if header is None:
-                    continue
-                
-                if employee.lower() in str(header).lower():
-                    employee_col = i + 1
-                    
-                    print("Matched employee column:", employee_col)
-                    break
+            if status not in status_colors:
 
-            if employee_col is None:
-                return jsonify({
+                return {
                     "success": False,
-                    "message": "Employee not found."
-                }), 404
+                    "message": f"Unknown status: {value}"
+                }
 
-            cell = ws.cell(task_row, employee_col)
+            fill = PatternFill(
+                fill_type="solid",
+                start_color=status_colors[status],
+                end_color=status_colors[status]
+            )
 
-            if cell.value is not None:
-                print("Old color:", cell.fill.start_color.rgb)
-                print("Updating cell:", task_row, employee_col)
-                cell.fill = fill
-                print("New color:", cell.fill.start_color.rgb)
+            # -----------------------------------------
+            # Specific employee
+            # -----------------------------------------
 
-        # ----------------------------
-        # Otherwise update everyone
-        # ----------------------------
+            if selected_employee:
+
+                employee_col = None
+
+                for i, header in enumerate(headers):
+
+                    if header is None:
+                        continue
+
+                    if selected_employee.strip().lower() in str(header).strip().lower():
+
+                        employee_col = i + 1
+
+                        print(
+                            "Matched employee column:",
+                            employee_col
+                        )
+
+                        break
+
+                if employee_col is None:
+
+                    return {
+                        "success": False,
+                        "message": f"Employee '{selected_employee}' not found."
+                    }
+
+                cell = ws.cell(task_row, employee_col)
+
+                if cell.value is not None:
+
+                    print(
+                        "Updating status:",
+                        task_row,
+                        employee_col
+                    )
+
+                    cell.fill = fill
+
+            # -----------------------------------------
+            # Everyone
+            # -----------------------------------------
+
+            else:
+
+                for c in range(3, open_col):
+
+                    cell = ws.cell(task_row, c)
+
+                    if cell.value is not None:
+
+                        cell.fill = fill
+
+        # ==================================================
+        # TASK NAME
+        # ==================================================
+
+        elif field == "task":
+
+            ws.cell(task_row, 2).value = value
+
+        # ==================================================
+        # OPEN DATE
+        # ==================================================
+
+        elif field == "open":
+
+            dt = datetime.strptime(value, "%Y-%m-%d")
+
+            ws.cell(task_row, open_col).value = dt
+            ws.cell(task_row, open_col).number_format = "dd-mmm"
+
+        # ==================================================
+        # CLOSE DATE
+        # ==================================================
+
+        elif field == "close":
+
+            dt = datetime.strptime(value, "%Y-%m-%d")
+
+            ws.cell(task_row, close_col).value = dt
+            ws.cell(task_row, close_col).number_format = "dd-mmm"
 
         else:
 
-            for c in range(3, open_col):
+            return {
+                "success": False,
+                "message": f"Unknown field: {field}"
+            }
 
-                cell = ws.cell(task_row, c)
-
-                if cell.value is not None:
-                    cell.fill = fill
-
-    # ==================================================
-    # TASK NAME
-    # ==================================================
-
-    elif field == "task":
-
-        ws.cell(task_row, 2).value = value
-
-    # ==================================================
-    # OPEN DATE
-    # ==================================================
-
-    elif field == "open":
-
-        dt = datetime.strptime(value, "%Y-%m-%d")
-
-        ws.cell(task_row, open_col).value = dt
-        ws.cell(task_row, open_col).number_format = "dd-mmm"
-
-    # ==================================================
-    # CLOSE DATE
-    # ==================================================
-
-    elif field == "close":
-
-        dt = datetime.strptime(value, "%Y-%m-%d")
-
-        ws.cell(task_row, close_col).value = dt
-        ws.cell(task_row, close_col).number_format = "dd-mmm"
-
-    else:
-
-        return jsonify({
-            "success": False,
-            "message": "Unknown field."
-        }), 400
-
-    wb.save(local_file)
-    update_file(drive_file_id, local_file)
-    global DB
-    new_tasks = extract_tasks(local_file)
-    DB = [{
-        "file": "jobcard.xlsx",
-        "path": local_file,
-        "tasks": new_tasks
-    }]
-    
-    print("Workbook saved.")
-
-    # Refresh dashboard data
-    new_tasks = extract_tasks(local_file)
-
-    if DB:
-        DB[0]["tasks"] = new_tasks
-        
-
-    try:
-        os.remove(local_file)
-    except Exception as e:
-        print("Couldn't delete temporary file:", e)
-
-    print("Task updated!")
-
-    return jsonify({
-        "success": True,
-        "task": task,
-        "field": field,
-        "value": value,
-        "employees": employees,
-        "emails": emails
-    })
-
-@app.route("/add-employee", methods=["POST"])
-def add_employee():
-
-    data = request.json
-
-    print("========== ADD EMPLOYEE ==========")
-    print(data)
-
-    employee = data["employee"]
-    email = data["email"]
-    drive_file_id = data["drive_file_id"]
-
-    local_file = download_file(drive_file_id)
-
-    wb = load_workbook(local_file)
-    ws = wb.active
-
-    headers = [cell.value for cell in ws[1]]
-
-    open_col = headers.index("Open") + 1
-
-    if employee in headers:
-        os.remove(local_file)
-        return jsonify({
-            "success": False,
-            "message": "Employee already exists."
-        })
-
-    # Save email in database
-    print("BEFORE SQLITE INSERT")
-    print("Employee:", employee)
-    print("Email:", email)
-    add_employee_sheet(employee,email)
-
-
-    # Insert new employee column BEFORE Open
-    try:
-        ws.insert_cols(open_col)
-        ws.cell(row=1, column=open_col).value = employee
-
-        for r in range(2, ws.max_row + 1):
-            ws.cell(r, open_col).value = None
+        # -----------------------------------------
+        # Save Excel
+        # -----------------------------------------
 
         wb.save(local_file)
 
-        update_file(drive_file_id, local_file)
+        print("Workbook saved after update.")
+
+        # -----------------------------------------
+        # Upload to Drive
+        # -----------------------------------------
+
+        update_file(
+            drive_file_id,
+            local_file
+        )
+
+        print("Drive updated after update.")
+
+        # -----------------------------------------
+        # Refresh DB
+        # -----------------------------------------
+
         global DB
+
         new_tasks = extract_tasks(local_file)
+
         DB = [{
             "file": "jobcard.xlsx",
             "path": local_file,
             "tasks": new_tasks
         }]
-        
-        new_tasks = extract_tasks(local_file)
 
-        if DB:
-            DB[0]["tasks"] = new_tasks
+        print("UPDATE SUCCESS")
+
+        return {
+            "success": True,
+            "task": task,
+            "field": field,
+            "value": value,
+            "employees": employees,
+            "selected_employee": selected_employee
+        }
+
+    finally:
+
+        if local_file:
+
+            try:
+                os.remove(local_file)
+            except Exception as e:
+                print(
+                    "Couldn't delete temporary file:",
+                    e
+                )
+
+@app.route("/update-task", methods=["POST"])
+def update_task():
+
+    try:
+
+        data = request.json
+
+        print("========== UPDATE TASK ROUTE ==========")
+        print(data)
+
+        task = data["task"]
+        field = data["field"]
+        value = data["value"]
+
+        employees = data.get("employees", [])
+
+        selected_employee = data.get(
+            "selected_employee",
+            ""
+        )
+
+        drive_file_id = data["drive_file_id"]
+
+        result = update_task_logic(
+            task=task,
+            field=field,
+            value=value,
+            employees=employees,
+            selected_employee=selected_employee,
+            drive_file_id=drive_file_id
+        )
+
+        print("UPDATE LOGIC RESULT:", result)
+
+        if not result.get("success", False):
+
+            return jsonify(result), 400
+
+        return jsonify(result), 200
 
     except Exception as e:
-        print("ADD EMPLOYEE FAILED:")
+
+        print("========== UPDATE TASK ERROR ==========")
+        print("ERROR:", str(e))
+
+        import traceback
         traceback.print_exc()
+
         return jsonify({
             "success": False,
-            "message": str(e)
+            "message": "Update task failed.",
+            "error": str(e)
         }), 500
+def add_employee_logic(employee, email, drive_file_id):
+    try:
+        print("========== ADD EMPLOYEE LOGIC ==========")
+        print("Employee:", employee)
+        print("Email:", email)
 
-    return jsonify({
-        "success": True,
-        "message": f"{employee} added successfully."
-    })
+        create_employee(
+            employee,
+            email,
+            drive_file_id
+        )
 
+        print("EMPLOYEE CREATED:", employee)
 
+        return {
+            "success": True,
+            "employee": employee,
+            "email": email
+        }
+
+    except Exception as e:
+        print("ADD EMPLOYEE LOGIC ERROR:", str(e))
+
+        import traceback
+        traceback.print_exc()
+
+        return {
+            "success": False,
+            "message": str(e)
+        }
+    
+@app.route("/add-employee", methods=["POST"])
+def add_employee():
+
+    try:
+        data = request.json or {}
+
+        employee = data.get("employee", "")
+        email = data.get("email", "")
+        drive_file_id = data.get("drive_file_id")
+
+        print("========== ADD EMPLOYEE ROUTE ==========")
+        print(data)
+
+        result = add_employee_logic(
+            employee=employee,
+            email=email,
+            drive_file_id=drive_file_id
+        )
+
+        print("ADD EMPLOYEE RESULT:", result)
+
+        if not result.get("success"):
+            return jsonify(result), 400
+
+        # Send welcome email through n8n
+        n8n_result = send_to_n8n(
+            action="welcome_employee",
+            task="",
+            employees=[employee],
+            open_date="",
+            close_date="",
+            drive_file_id=drive_file_id
+        )
+
+        print("WELCOME EMAIL N8N RESULT:", n8n_result)
+
+        return jsonify({
+            "success": True,
+            "message": f"{employee} added successfully.",
+            "employee": employee,
+            "email": email,
+            "email_sent": n8n_result
+        }), 200
+
+    except Exception as e:
+
+        print("========== ADD EMPLOYEE ERROR ==========")
+        print("ERROR:", str(e))
+
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 @app.route("/download")
 def download():
 
