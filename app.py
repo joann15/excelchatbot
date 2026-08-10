@@ -1370,9 +1370,10 @@ def add_employee_sheet(name,email):
     ])
 
     print("Added to Google Sheet:", name)
-
 def create_employee(employee, email, drive_file_id):
-    add_employee_sheet(employee,email)
+    global DB
+
+    add_employee_sheet(employee, email)
 
     local_file = download_file(drive_file_id)
 
@@ -1389,18 +1390,9 @@ def create_employee(employee, email, drive_file_id):
     wb.save(local_file)
 
     update_file(drive_file_id, local_file)
-    global DB
-    new_tasks = extract_tasks(local_file)
-
-    DB = [{
-        "file": "jobcard.xlsx",
-        "path": local_file,
-        "tasks": new_tasks
-    }]
 
     new_tasks = extract_tasks(local_file)
 
-    global DB
     DB = [{
         "file": "jobcard.xlsx",
         "path": local_file,
