@@ -1402,15 +1402,18 @@ def create_employee(employee, email, drive_file_id):
     os.remove(local_file)
 
     return True
-
 def delete_task_logic(task, drive_file_id):
 
     local_file = None
 
     try:
-
         print("========== DELETE TASK LOGIC ==========")
         print("Task:", task)
+        print("Drive File ID:", drive_file_id)
+
+        # -----------------------------------------
+        # Download latest Excel from Google Drive
+        # -----------------------------------------
 
         local_file = download_file(drive_file_id)
 
@@ -1418,6 +1421,8 @@ def delete_task_logic(task, drive_file_id):
         ws = wb.active
 
         headers = [cell.value for cell in ws[1]]
+
+        print("Headers:", headers)
 
         # -----------------------------------------
         # Find task row
@@ -1427,16 +1432,32 @@ def delete_task_logic(task, drive_file_id):
 
         for r in range(2, ws.max_row + 1):
 
-            cell_value = ws.cell(r, 2).value
+            for c in range(1, ws.max_column + 1):
 
-            if cell_value is None:
-                continue
+                cell_value = ws.cell(r, c).value
 
-            if str(cell_value).strip().lower() == task.strip().lower():
-                task_row = r
+                if cell_value is None:
+                    continue
+
+                if str(cell_value).strip().lower() == task.strip().lower():
+
+                    task_row = r
+                    print(
+                        f"Found task '{task}' "
+                        f"at row {r}, column {c}"
+                    )
+                    break
+
+            if task_row is not None:
                 break
 
+        # -----------------------------------------
+        # Task not found
+        # -----------------------------------------
+
         if task_row is None:
+
+            print(f"TASK NOT FOUND: {task}")
 
             return {
                 "success": False,
@@ -1444,11 +1465,22 @@ def delete_task_logic(task, drive_file_id):
             }
 
         # -----------------------------------------
+        # Find Open column
+        # -----------------------------------------
+
+        if "Open" not in headers:
+
+            return {
+                "success": False,
+                "message": "Open column not found in Excel."
+            }
+
+        open_col = headers.index("Open") + 1
+
+        # -----------------------------------------
         # Find employees assigned to task
         # BEFORE deleting row
         # -----------------------------------------
-
-        open_col = headers.index("Open") + 1
 
         employees = []
 
@@ -1463,15 +1495,22 @@ def delete_task_logic(task, drive_file_id):
 
             if cell.value is not None:
 
-                employees.append(str(header).strip())
+                employees.append(
+                    str(header).strip()
+                )
 
         print("Employees assigned:", employees)
 
         # -----------------------------------------
-        # Delete row
+        # Delete task row
         # -----------------------------------------
 
         ws.delete_rows(task_row, 1)
+
+        print(
+            f"Deleted row {task_row} "
+            f"for task '{task}'."
+        )
 
         # -----------------------------------------
         # Save Excel
@@ -1482,7 +1521,7 @@ def delete_task_logic(task, drive_file_id):
         print("Workbook saved after delete.")
 
         # -----------------------------------------
-        # Upload back to Drive
+        # Upload updated Excel back to Drive
         # -----------------------------------------
 
         update_file(
@@ -1493,7 +1532,7 @@ def delete_task_logic(task, drive_file_id):
         print("Drive updated after delete.")
 
         # -----------------------------------------
-        # Refresh DB
+        # Refresh in-memory DB
         # -----------------------------------------
 
         new_tasks = extract_tasks(local_file)
@@ -1515,8 +1554,10 @@ def delete_task_logic(task, drive_file_id):
 
             try:
                 os.remove(local_file)
+
             except Exception:
                 pass
+            
 @app.route("/delete-task", methods=["POST"])
 def delete_task():
     try:
