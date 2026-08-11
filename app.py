@@ -1402,6 +1402,7 @@ def create_employee(employee, email, drive_file_id):
     os.remove(local_file)
 
     return True
+
 def delete_task_logic(task, drive_file_id):
 
     local_file = None
@@ -1419,6 +1420,10 @@ def delete_task_logic(task, drive_file_id):
 
         wb = load_workbook(local_file)
         ws = wb.active
+        print("WORKBOOK OPENED")
+        print("SHEET:", ws.title)
+        print("MAX ROW:", ws.max_row)
+        print("MAX COLUMN:", ws.max_column)
 
         headers = [cell.value for cell in ws[1]]
 
@@ -1440,12 +1445,10 @@ def delete_task_logic(task, drive_file_id):
                     continue
 
                 if str(cell_value).strip().lower() == task.strip().lower():
+                    print("***** TASK FOUND *****")
+                    print("TASK ROW:", r)
 
                     task_row = r
-                    print(
-                        f"Found task '{task}' "
-                        f"at row {r}, column {c}"
-                    )
                     break
 
             if task_row is not None:
@@ -1457,7 +1460,9 @@ def delete_task_logic(task, drive_file_id):
 
         if task_row is None:
 
-            print(f"TASK NOT FOUND: {task}")
+            print("!!!!!!!! TASK NOT FOUND !!!!!!!!")
+            print("Task searched:", repr(task))
+            print("Drive file:", drive_file_id)
 
             return {
                 "success": False,
