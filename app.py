@@ -1402,7 +1402,6 @@ def create_employee(employee, email, drive_file_id):
     os.remove(local_file)
 
     return True
-
 def delete_task_logic(task, drive_file_id):
 
     local_file = None
@@ -1420,6 +1419,7 @@ def delete_task_logic(task, drive_file_id):
 
         wb = load_workbook(local_file)
         ws = wb.active
+
         print("WORKBOOK OPENED")
         print("SHEET:", ws.title)
         print("MAX ROW:", ws.max_row)
@@ -1431,19 +1431,25 @@ def delete_task_logic(task, drive_file_id):
 
         # -----------------------------------------
         # Find task row
+        # Column B = Task
         # -----------------------------------------
-        
+
         task_row = None
+
         for r in range(2, ws.max_row + 1):
 
-            cell_value = ws.cell(r, 1).value
+            cell_value = ws.cell(r, 2).value
+
             if cell_value is None:
                 continue
 
             if str(cell_value).strip().lower() == str(task).strip().lower():
+
                 print("***** TASK FOUND *****")
                 print("TASK ROW:", r)
-                print("TASK VALUE:", cell_value)
+                print("TASK COLUMN:", 2)
+                print("TASK VALUE:", repr(cell_value))
+
                 task_row = r
                 break
 
@@ -1452,6 +1458,7 @@ def delete_task_logic(task, drive_file_id):
         # -----------------------------------------
 
         if task_row is None:
+
             print("!!!!!!!! TASK NOT FOUND !!!!!!!!")
             print("Task searched:", repr(task))
             print("Drive file:", drive_file_id)
@@ -1460,7 +1467,6 @@ def delete_task_logic(task, drive_file_id):
                 "success": False,
                 "message": f"Task '{task}' not found."
             }
-
 
         # -----------------------------------------
         # Find Open column
@@ -1476,8 +1482,7 @@ def delete_task_logic(task, drive_file_id):
         open_col = headers.index("Open") + 1
 
         # -----------------------------------------
-        # Find employees assigned to task
-        # BEFORE deleting row
+        # Find employees BEFORE deleting
         # -----------------------------------------
 
         employees = []
@@ -1499,8 +1504,17 @@ def delete_task_logic(task, drive_file_id):
 
         print("Employees assigned:", employees)
 
-        emails = [get_employee_email(emp) for emp in employees]
+        # -----------------------------------------
+        # Get employee emails BEFORE deleting
+        # -----------------------------------------
+
+        emails = [
+            get_employee_email(emp)
+            for emp in employees
+        ]
+
         print("Emails assigned:", emails)
+
         # -----------------------------------------
         # Delete task row
         # -----------------------------------------
@@ -1521,7 +1535,7 @@ def delete_task_logic(task, drive_file_id):
         print("Workbook saved after delete.")
 
         # -----------------------------------------
-        # Upload updated Excel back to Drive
+        # Upload updated Excel to Google Drive
         # -----------------------------------------
 
         update_file(
@@ -1547,6 +1561,16 @@ def delete_task_logic(task, drive_file_id):
             "task": task,
             "employees": employees,
             "emails": emails
+        }
+
+    except Exception as e:
+
+        print("!!!!!!!! DELETE TASK ERROR !!!!!!!!")
+        print(str(e))
+
+        return {
+            "success": False,
+            "message": str(e)
         }
 
     finally:
