@@ -1432,26 +1432,19 @@ def delete_task_logic(task, drive_file_id):
         # -----------------------------------------
         # Find task row
         # -----------------------------------------
-
+        
         task_row = None
-
         for r in range(2, ws.max_row + 1):
 
-            for c in range(1, ws.max_column + 1):
+            cell_value = ws.cell(r, 1).value
+            if cell_value is None:
+                continue
 
-                cell_value = ws.cell(r, c).value
-
-                if cell_value is None:
-                    continue
-
-                if str(cell_value).strip().lower() == task.strip().lower():
-                    print("***** TASK FOUND *****")
-                    print("TASK ROW:", r)
-
-                    task_row = r
-                    break
-
-            if task_row is not None:
+            if str(cell_value).strip().lower() == str(task).strip().lower():
+                print("***** TASK FOUND *****")
+                print("TASK ROW:", r)
+                print("TASK VALUE:", cell_value)
+                task_row = r
                 break
 
         # -----------------------------------------
@@ -1459,7 +1452,6 @@ def delete_task_logic(task, drive_file_id):
         # -----------------------------------------
 
         if task_row is None:
-
             print("!!!!!!!! TASK NOT FOUND !!!!!!!!")
             print("Task searched:", repr(task))
             print("Drive file:", drive_file_id)
@@ -1468,6 +1460,7 @@ def delete_task_logic(task, drive_file_id):
                 "success": False,
                 "message": f"Task '{task}' not found."
             }
+
 
         # -----------------------------------------
         # Find Open column
