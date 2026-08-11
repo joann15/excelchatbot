@@ -1402,6 +1402,7 @@ def create_employee(employee, email, drive_file_id):
     os.remove(local_file)
 
     return True
+
 def delete_task_logic(task, drive_file_id):
 
     local_file = None
@@ -1416,14 +1417,31 @@ def delete_task_logic(task, drive_file_id):
         # -----------------------------------------
 
         local_file = download_file(drive_file_id)
+        print("========== DOWNLOADED FILE FOR DELETE ==========")
+        print("LOCAL FILE:", local_file)
 
+        if not local_file or not os.path.exists(local_file):
+            print("!!!!!!!! DOWNLOAD FAILED !!!!!!!!")
+            return {
+                "success": False,
+                "message": "Could not download Excel file from Google Drive."
+            }
         wb = load_workbook(local_file)
         ws = wb.active
-
+        
         print("WORKBOOK OPENED")
         print("SHEET:", ws.title)
         print("MAX ROW:", ws.max_row)
         print("MAX COLUMN:", ws.max_column)
+        print("========== DELETE WORKBOOK CONTENT ==========")
+
+        for r in range(1, ws.max_row + 1):
+            print(
+                "ROW", r,
+                "| A:", repr(ws.cell(r, 1).value),
+                "| B:", repr(ws.cell(r, 2).value)
+            )
+        print("========== END DELETE WORKBOOK CONTENT ==========")
 
         headers = [cell.value for cell in ws[1]]
 
