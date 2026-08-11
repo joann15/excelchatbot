@@ -157,7 +157,8 @@ def send_to_n8n(
     drive_file_id,
     field="",
     value="",
-    updates=None
+    updates=None,
+    emails=None
 ):
     try:
 
@@ -1210,20 +1211,19 @@ Otherwise return:
 
             try:
                 result = add_employee_logic(
-                employee=employee,
-                email=email,
-                drive_file_id=LAST_DRIVE_FILE_ID
+                    employee=employee,
+                    email=email,
+                    drive_file_id=LAST_DRIVE_FILE_ID
                 )
                 print("ADD EMPLOYEE RESULT:", result)
-                
 
                 if not result.get("success", False):
                     return jsonify({
                         "answer": result.get(
                         "message",
                         "Failed to add employee."
-                        ),
-                        "success": False
+                    ),
+                    "success": False
                     }), 400
 
                 try:
@@ -1235,27 +1235,28 @@ Otherwise return:
                         close_date="",
                         drive_file_id=LAST_DRIVE_FILE_ID
                     )
-
                     print("WELCOME EMAIL N8N RESULT:", n8n_result)
 
                 except Exception as n8n_error:
-                    print("WELCOME EMAIL FAILED:", str(n8n_error))
+                    print("WELCOME EMAIL N8N ERROR:", str(n8n_error))
+
                     import traceback
                     traceback.print_exc()
                     n8n_result = False
 
-                    return jsonify({
-                        "answer": f"{employee} added successfully.",
-                        "success": True,
-                        "email_sent": n8n_result
-                    }), 200
+                return jsonify({
+                    "answer": f"Employee '{employee}' added successfully.",
+                    "success": True,
+                    "email_sent": n8n_result
+                }), 200
 
             except Exception as e:
-                print("========== ADD EMPLOYEE ERROR ==========")
+                print("========== CHAT ADD EMPLOYEE ERROR ==========")
                 print("ERROR:", str(e))
-
+                
                 import traceback
                 traceback.print_exc()
+
                 return jsonify({
                     "answer": "Failed to add employee.",
                     "success": False,
