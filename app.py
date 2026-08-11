@@ -1506,6 +1506,8 @@ def delete_task_logic(task, drive_file_id):
 
         print("Employees assigned:", employees)
 
+        emails = [get_employee_email(emp) for emp in employees]
+        print("Emails assigned:", emails)
         # -----------------------------------------
         # Delete task row
         # -----------------------------------------
@@ -1550,7 +1552,8 @@ def delete_task_logic(task, drive_file_id):
         return {
             "success": True,
             "task": task,
-            "employees": employees
+            "employees": employees,
+            "emails": emails
         }
 
     finally:
@@ -1588,7 +1591,8 @@ def delete_task():
             "success": True,
             "message": f"{task} deleted successfully.",
             "task": task,
-            "employees": result.get("employees", [])
+            "employees": result.get("employees", []),
+            "emails": result.get("emails", [])
         }), 200
 
     except Exception as e:
