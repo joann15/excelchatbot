@@ -1427,6 +1427,15 @@ def delete_task_logic(task, drive_file_id):
 
         headers = [cell.value for cell in ws[1]]
 
+        print("========== ALL EXCEL ROWS ==========")
+        for r in range(1, ws.max_row + 1):
+            print(
+                "ROW", r,
+                "| COL A:", repr(ws.cell(r, 1).value),
+                "| COL B:", repr(ws.cell(r, 2).value)
+                )
+        print("========== END EXCEL ROWS ==========")
+
         print("Headers:", headers)
 
         # -----------------------------------------
