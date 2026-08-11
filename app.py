@@ -1701,7 +1701,7 @@ def update_task_logic(
         print("Employees:", employees)
         print("Selected employee:", selected_employee)
 
-        field = field.lower()
+        field = str(field).strip().lower()
 
         field_map = {
             "name": "task",
@@ -1768,7 +1768,7 @@ def update_task_logic(
                 "na": "FFFFF2CC"
             }
 
-            status = value.lower()
+            status = str(value).strip().lower()
 
             if status not in status_colors:
 
@@ -1783,48 +1783,29 @@ def update_task_logic(
                 end_color=status_colors[status]
             )
 
-            # -----------------------------------------
-            # Specific employee
-            # -----------------------------------------
+            if employees:
+                updated_employees = []
 
-            if selected_employee:
+                for employee in employees:
+                    employee_col = None
 
-                employee_col = None
+                    for i, header in enumerate(headers):
+                        if header is None:
+                            continue
+                        if employee.strip().lower() == str(header).strip().lower():
+                            employee_col = i + 1
+                            break
+                    if employee_col is None:
+                        return {
+                            "success": False,
+                            "message": f"Employee '{employee}' not found."
+                        }
 
-                for i, header in enumerate(headers):
-
-                    if header is None:
-                        continue
-
-                    if selected_employee.strip().lower() in str(header).strip().lower():
-
-                        employee_col = i + 1
-
-                        print(
-                            "Matched employee column:",
-                            employee_col
-                        )
-
-                        break
-
-                if employee_col is None:
-
-                    return {
-                        "success": False,
-                        "message": f"Employee '{selected_employee}' not found."
-                    }
-
-                cell = ws.cell(task_row, employee_col)
-
-                if cell.value is not None:
-
-                    print(
-                        "Updating status:",
-                        task_row,
-                        employee_col
-                    )
-
-                    cell.fill = fill
+                    cell = ws.cell(task_row, employee_col)
+                    if cell.value is not None:
+                        cell.fill = fill
+                        updated_employees.append(employee)
+                        print("Updated employees:", updated_employees)
 
             # -----------------------------------------
             # Everyone
@@ -1932,7 +1913,6 @@ def update_task_logic(
                     "Couldn't delete temporary file:",
                     e
                 )
-
 @app.route("/update-task", methods=["POST"])
 def update_task():
 
@@ -1941,7 +1921,7 @@ def update_task():
         data = request.json
 
         print("========== UPDATE TASK ROUTE ==========")
-        print(data)
+        print("DATA:", data)
 
         task = data["task"]
         field = data["field"]
@@ -1968,7 +1948,6 @@ def update_task():
         print("UPDATE LOGIC RESULT:", result)
 
         if not result.get("success", False):
-
             return jsonify(result), 400
 
         return jsonify(result), 200
@@ -1986,6 +1965,7 @@ def update_task():
             "message": "Update task failed.",
             "error": str(e)
         }), 500
+    
 def add_employee_logic(employee, email, drive_file_id):
     try:
         print("========== ADD EMPLOYEE LOGIC ==========")
