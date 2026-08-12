@@ -1,3 +1,4 @@
+from email import message
 import os
 import json
 from urllib import response
@@ -1035,36 +1036,51 @@ Otherwise return:
         elif action == "delete":
             task = command_json.get("task", "")
 
+
             try:
                 result = delete_task_logic(
-                    task=task,
-                    drive_file_id=LAST_DRIVE_FILE_ID
+                task=task,
+                drive_file_id=LAST_DRIVE_FILE_ID
                 )
-                print("DELETE LOGIC RESULT:", result)
 
+                print("DELETE LOGIC RESULT:", result)
                 if not result.get("success", False):
                     return jsonify({
                         "answer": result.get(
-                            "message",
-                            "Task deletion failed."
-                        ),
-                        "success": False
+                        "message",
+                        "Task deletion failed."
+                    ),
+                    "success": False
                     }), 400
-
                 employees = result.get("employees", [])
 
-                n8n_result = send_to_n8n(
-                    action="delete",
-                    task=task,
-                    employees=employees,
-                    open_date="",
-                    close_date="",
-                    drive_file_id=LAST_DRIVE_FILE_ID
-                )
+                   # Send deletion email through n8n
+                        
+                try:
+                    n8n_result = send_to_n8n(
+                        action="delete",
+                        task=task,
+                        employees=employees,
+                        open_date="",
+                        close_date="",
+                        drive_file_id=LAST_DRIVE_FILE_ID
+                    )
+                    print("DELETE N8N RESULT:", n8n_result)
 
-                print("DELETE N8N RESULT:", n8n_result)
+                except Exception as n8n_error:
+                    print("DELETE N8N ERROR:", str(n8n_error))
+
+                    import traceback
+                    traceback.print_exc()
+                    n8n_result = False
+
+                if n8n_result:
+                    message = f"Task '{task}' deleted successfully and notification email sent."
+                else:
+                    message = f"Task '{task}' deleted successfully, but the notification email could not be sent."
+
                 return jsonify({
-                    "answer": f"Task '{task}' deleted successfully.",
+                    "answer": message,
                     "success": True,
                     "email_sent": n8n_result
                 }), 200
@@ -1072,14 +1088,15 @@ Otherwise return:
             except Exception as e:
                 print("========== CHAT DELETE ERROR ==========")
                 print("ERROR:", str(e))
+
                 import traceback
                 traceback.print_exc()
-
-            return jsonify({
-                "answer": "Task deletion failed.",
-                "success": False,
-                "error": str(e)
-            }), 500
+                
+                return jsonify({
+                    "answer": "Task deletion failed.",
+                    "success": False,
+                    "error": str(e)
+                }), 500
 
         # ====================================================
         # DELETE EMPLOYEE
@@ -1361,13 +1378,12 @@ QUESTION
         print("========== CHAT CRASH ==========")
         print("ERROR:", str(e))
 
-    import traceback
-    traceback.print_exc()
-
-    return jsonify({
-        "answer": "Backend crashed",
-        "error": str(e)
-    }), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "answer": "Backend crashed",
+            "error": str(e)
+        }), 500
 
 def normalize_name(name):
     if not name:
