@@ -1081,6 +1081,49 @@ Otherwise return:
                 "error": str(e)
             }), 500
 
+        # ====================================================
+        # DELETE EMPLOYEE
+        # ====================================================
+        elif action == "delete_employee":
+            employee = command_json.get("name", "").strip()
+            print("========== CHAT DELETE EMPLOYEE ==========")
+            print("Employee:", employee)
+
+            try:
+                result = delete_employee_logic(
+                employee=employee,
+                    drive_file_id=LAST_DRIVE_FILE_ID
+                )
+                print("DELETE EMPLOYEE LOGIC RESULT:", result)
+
+                if not result.get("success", False):
+                    return jsonify({
+                        "answer": result.get(
+                        "message",
+                        "Employee deletion failed."
+                    ),
+                    "success": False
+                    }), 400
+
+                return jsonify({
+                    "answer": f"Employee '{employee}' deleted successfully.",
+                    "success": True,
+                    "employee": employee
+                }), 200
+
+            except Exception as e:
+                print("========== CHAT DELETE EMPLOYEE ERROR ==========")
+                print("ERROR:", str(e))
+
+                import traceback
+                traceback.print_exc()
+
+                return jsonify({
+                    "answer": "Employee deletion failed.",
+                    "success": False,
+                    "error": str(e)
+                }), 500
+
 
         # ====================================================
         # UPDATE TASK
@@ -1364,6 +1407,7 @@ def add_employee_sheet(name,email):
     ])
 
     print("Added to Google Sheet:", name)
+
 def create_employee(employee, email, drive_file_id):
     global DB
 
@@ -1603,7 +1647,9 @@ def delete_task_logic(task, drive_file_id):
 
             except Exception:
                 pass
-            
+
+
+                   
 @app.route("/delete-task", methods=["POST"])
 def delete_task():
     try:
@@ -1646,6 +1692,209 @@ def delete_task():
             "message": "Delete task failed.",
             "error": str(e)
         }), 500
+
+def delete_employee_sheet(employee):
+    try:
+        print("========== DELETE EMPLOYEE FROM GOOGLE SHEET ==========")
+        print("Employee:", employee)
+
+        sheet = get_employee_sheet()
+
+        # Get all rows
+        records = sheet.get_all_records()
+
+        # Find employee row
+        for index, row in enumerate(records, start=2):
+
+            sheet_employee = str(
+                row.get("employee_name", "")
+            ).strip()
+
+            if sheet_employee.lower() == employee.strip().lower():
+
+                print("FOUND EMPLOYEE IN GOOGLE SHEET")
+                print("ROW:", index)
+
+                # Delete the row
+                sheet.delete_rows(index)
+
+                print(
+                    f"Deleted employee '{employee}' "
+                    f"from Google Sheet."
+                )
+
+                return True
+
+        print(
+            f"Employee '{employee}' "
+            f"not found in Google Sheet."
+        )
+
+        return False
+
+    except Exception as e:
+
+        print("DELETE EMPLOYEE SHEET ERROR:", str(e))
+
+        import traceback
+        traceback.print_exc()
+
+        raise
+
+def delete_employee_logic(employee, drive_file_id):
+    global DB
+
+    local_file = None
+
+    try:
+        print("========== DELETE EMPLOYEE LOGIC ==========")
+        print("Employee:", employee)
+        print("Drive File ID:", drive_file_id)
+
+        # --------------------------------
+        # 1. Download latest Excel
+        # --------------------------------
+        local_file = download_file(drive_file_id)
+
+        if not local_file or not os.path.exists(local_file):
+            return {
+                "success": False,
+                "message": "Could not download Excel file from Google Drive."
+            }
+
+        wb = load_workbook(local_file)
+        ws = wb.active
+
+        headers = [cell.value for cell in ws[1]]
+
+        print("Excel Headers:", headers)
+
+        # --------------------------------
+        # 2. Find employee column
+        # --------------------------------
+        if employee not in headers:
+
+            return {
+                "success": False,
+                "message": f"Employee '{employee}' was not found in the Job Card."
+            }
+
+        employee_col = headers.index(employee) + 1
+
+        print("EMPLOYEE COLUMN:", employee_col)
+
+        # --------------------------------
+        # 3. Delete employee column
+        # --------------------------------
+        ws.delete_cols(employee_col, 1)
+
+        print(f"Deleted column for employee '{employee}'.")
+
+        # --------------------------------
+        # 4. Save Excel
+        # --------------------------------
+        wb.save(local_file)
+
+        print("Workbook saved.")
+
+        # --------------------------------
+        # 5. Upload updated Excel
+        # --------------------------------
+        update_file(
+            drive_file_id,
+            local_file
+        )
+
+        print("Drive updated.")
+
+        # --------------------------------
+        # 6. Remove employee from Google Sheet
+        # --------------------------------
+        delete_employee_sheet(employee)
+
+        print("Employee removed from employee sheet.")
+
+        # --------------------------------
+        # 7. Refresh DB
+        # --------------------------------
+        new_tasks = extract_tasks(local_file)
+
+        DB = [{
+            "file": "jobcard.xlsx",
+            "path": local_file,
+            "tasks": new_tasks
+        }]
+
+        print("DB refreshed.")
+
+        return {
+            "success": True,
+            "employee": employee
+        }
+
+    except Exception as e:
+
+        print("========== DELETE EMPLOYEE ERROR ==========")
+        print("ERROR:", str(e))
+
+        import traceback
+        traceback.print_exc()
+
+        return {
+            "success": False,
+            "message": str(e)
+        }
+
+    finally:
+
+        if local_file and os.path.exists(local_file):
+            try:
+                os.remove(local_file)
+            except Exception:
+                pass
+
+@app.route("/delete-employee", methods=["POST"])
+def delete_employee():
+
+    try:
+        data = request.json or {}
+
+        employee = data.get("employee", "")
+        drive_file_id = data.get("drive_file_id")
+
+        print("========== DELETE EMPLOYEE ROUTE ==========")
+        print(data)
+
+        result = delete_employee_logic(
+            employee=employee,
+            drive_file_id=drive_file_id
+        )
+
+        print("DELETE EMPLOYEE RESULT:", result)
+
+        if not result.get("success", False):
+            return jsonify(result), 404
+
+        return jsonify({
+            "success": True,
+            "message": f"{employee} deleted successfully.",
+            "employee": employee
+        }), 200
+
+    except Exception as e:
+
+        print("========== DELETE EMPLOYEE ROUTE ERROR ==========")
+        print("ERROR:", str(e))
+
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({
+            "success": False,
+            "message": "Delete employee failed.",
+            "error": str(e)
+        }), 500
+
 
 @app.route("/task-details", methods=["POST"])
 def task_details():
